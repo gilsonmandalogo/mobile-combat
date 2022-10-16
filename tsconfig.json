@@ -4,7 +4,8 @@
     "types": ["astro/client"],
     "baseUrl": ".",
     "paths": {
-      "@src/*": ["src/*"]
+      "@src/*": ["src/*"],
+      "@heroes/*": ["src/heroes/*"]
     }
   }
 }

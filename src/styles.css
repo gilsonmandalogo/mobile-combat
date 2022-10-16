@@ -2,3 +2,15 @@ body {
   overflow: hidden;
   margin: 0;
 }
+
+canvas {
+  outline: none;
+}
+
+#debug {
+  position: absolute;
+  width: 100%;
+  z-index: 100;
+  color: white;
+  padding: 1rem;
+}
