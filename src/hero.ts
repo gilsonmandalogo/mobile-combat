@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { ErrorUndefinedProperty } from '@src/errors'
 
 export enum HeroName {
   MrColinCole = 'Mr Colin Cole',
@@ -12,36 +13,47 @@ export interface HeroConstructor {
 }
 
 export default class Hero {
-  private _attackDamage: number
-  public get attackDamage(): number {
-    return this._attackDamage
+  protected _ready = false
+  public get ready() {
+    return this._ready
   }
-  public set attackDamage(value: number) {
-    this._attackDamage = value
+
+  private _attackDamage: number
+  public get attackDamage() {
+    return this._attackDamage
   }
 
   private _blockPower: number
-  public get blockPower(): number {
+  public get blockPower() {
     return this._blockPower
-  }
-  public set blockPower(value: number) {
-    this._blockPower = value
   }
 
   private _name: string
   public get name(): string {
     return this._name
   }
-  public set name(value: string) {
-    this._name = value
+
+  private _mesh?: THREE.Mesh
+  public get mesh() {
+    if (!this._mesh) {
+      throw new ErrorUndefinedProperty('mesh')
+    }
+
+    return this._mesh
   }
 
-  private _position = new THREE.Vector3()
-  public get position(): THREE.Vector3 {
-    return this._position
+  private _actor?: THREE.Group
+  public get actor() {
+    if (!this._actor) {
+      throw new ErrorUndefinedProperty('actor')
+    }
+
+    return this._actor
   }
-  public set position(value: THREE.Vector3) {
-    this._position = value
+
+  protected _atttackMembersColliders: Array<THREE.Mesh> = []
+  public get atttackMembersColliders() {
+    return this._atttackMembersColliders
   }
 
   constructor({
@@ -54,16 +66,22 @@ export default class Hero {
     this._name = name
   }
 
-  public loadMesh = async () => {
+  public async loadMesh() {
     const loader = new GLTFLoader()
     const model = await loader.loadAsync(`assets/models/${this.name.replaceAll(' ', '-')}.glb`)
+
     model.scene.traverse(child => {
       if (child instanceof THREE.Mesh && child.isMesh) {
+        if (!this._mesh) {
+          this._mesh = child
+        }
+
         child.receiveShadow = true
         child.castShadow = true
       }
     })
-    this._position = model.scene.children[0].position
+
+    this._actor = model.scene
     return model
   }
 }
