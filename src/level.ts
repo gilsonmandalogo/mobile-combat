@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 type LevelName = 'Mayan-Temple'
 
 export default class Level {
-  public loadLevel = async (name: LevelName) => {
+  public async loadLevel(name: LevelName) {
     const loader = new GLTFLoader()
     const model = await loader.loadAsync(`assets/models/${name}.glb`)
     model.scene.traverse(child => {

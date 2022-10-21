@@ -13,4 +13,5 @@ canvas {
   z-index: 100;
   color: white;
   padding: 1rem;
+  margin: 0;
 }
