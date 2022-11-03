@@ -4,9 +4,9 @@ import type { HeroName } from '@src/hero'
 import { getHeroClassByName } from '@src/utils'
 import { updateDebug } from '@src/debug'
 import { ErrorUndefinedProperty } from '@src/errors'
-import { OBB } from 'three/examples/jsm/math/OBB'
 
 type InputType = 'keyboard' | 'touch'
+type HitCallback = (player: Player) => void
 
 interface Inputs {
   left: string
@@ -25,12 +25,24 @@ interface PlayerConstructor {
   scene: THREE.Scene
   animations: Record<string, THREE.AnimationClip>
   playerName: string
+  leftSide: boolean
+  hitCallback: HitCallback
 }
 
 export default class Player {
-  private _life = 100
+  private _maxLife = 100
+  public get maxLife() {
+    return this._maxLife
+  }
+
+  private _life = this.maxLife
   public get life() {
     return this._life
+  }
+  public set life(value) {
+    this._life = value
+    updateDebug(`${this.playerName} life`, value)
+    this.hitCallback(this)
   }
 
   private _hero?: Hero
@@ -59,6 +71,20 @@ export default class Player {
     this._enemy = value
   }
 
+  private _playerName: string
+  public get playerName() {
+    return this._playerName
+  }
+
+  private _score = 0
+  public get score() {
+    return this._score
+  }
+  public set score(value) {
+    this._score = value
+    updateDebug(`${this.playerName} score`, value)
+  }
+
   private velocityX = 0
   private velocityY = 0
   private inputs: Inputs
@@ -71,9 +97,9 @@ export default class Player {
   private animationsActions: Record<string, THREE.AnimationAction> = {}
   private currentAnimation = 'Idle'
   private isPunching = false
-  private ray = new THREE.Raycaster()
-  private playerName: string
   private isHitting = false
+  private leftSide: boolean
+  private hitCallback: HitCallback
   private boxCollider = {
     my: new THREE.Box3(),
     enemy: new THREE.Box3(),
@@ -91,6 +117,8 @@ export default class Player {
     scene,
     animations,
     playerName,
+    leftSide,
+    hitCallback,
   }: PlayerConstructor) {
     this.inputs = inputs
     this.inputType = inputType
@@ -98,12 +126,14 @@ export default class Player {
     this.heroName = heroName
     this.scene = scene
     this.animations = animations
-    this.playerName = playerName
+    this._playerName = playerName
+    this.leftSide = leftSide
+    this.hitCallback = hitCallback
 
-    this.loadData()
+    this.life = this._life
   }
 
-  private async loadData() {
+  public async loadData() {
     const heroClass = getHeroClassByName(this.heroName)
     this._hero = new heroClass({})
     const heroMesh = await this.hero.loadMesh()
@@ -145,7 +175,6 @@ export default class Player {
     this.animationsActions['PunchDown'].setLoop(THREE.LoopOnce, 1)
 
     this.animationsActions[this.currentAnimation].play()
-    this.hero.actor.rotateY(Math.PI / 2)
 
     this._ready = true
   }
@@ -171,18 +200,18 @@ export default class Player {
   private onKeyDown = (e: KeyboardEvent) => {
     switch (e.code) {
       case this.inputs.left:
-        this.changeAnimation('WalkBackward')
+        this.changeAnimation(this.leftSide ? 'WalkBackward' : 'WalkForward')
         this.velocityX = -1
-        break;
+        break
       case this.inputs.right:
-        this.changeAnimation('WalkForward')
+        this.changeAnimation(this.leftSide ? 'WalkForward' : 'WalkBackward')
         this.velocityX = 1
-        break;
+        break
       case this.inputs.jump:
         if (this.velocityY === 0) {
           this.velocityY = 1
         }
-        break;
+        break
       case this.inputs.attackUp:
         if (!this.canPunch()) {
           return
@@ -196,9 +225,9 @@ export default class Player {
         }
         this.changeAnimation('PunchDown')
         this.isPunching = true
-        break;
+        break
       default:
-        break;
+        break
     }
   }
 
@@ -222,7 +251,7 @@ export default class Player {
   }
 
   public hit(damage: number) {
-    this._life -= damage
+    this.life -= damage
   }
 
   public update(delta: number) {
@@ -232,7 +261,6 @@ export default class Player {
 
     this.animationMixer!.update(delta)
     updateDebug(`${this.playerName} velocityX`, this.velocityX)
-    updateDebug(`${this.playerName} life`, this.life)
 
     const newPosition = new THREE.Vector3(this.velocityX * 0.1, this.velocityY * delta)
     this.hero.actor.position.add(newPosition)

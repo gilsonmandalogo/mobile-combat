@@ -1,9 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import Level from '@src/level'
-import Player from '@src/player'
-import type { HeroName } from '@src/hero'
-import Animations from '@src/animations'
+import Game from '@src/game'
 
 const scene = new THREE.Scene()
 
@@ -22,45 +20,12 @@ const camera = level.cameras[0] as THREE.PerspectiveCamera
 camera.aspect = window.innerWidth / window.innerHeight
 camera.updateProjectionMatrix()
 
-const animationController = new Animations()
-await animationController.loadAnimations()
-
-const player1 = new Player({
-  playerName: 'Player 1',
+const gameController = new Game({
   domElement: renderer.domElement,
-  heroName: 'Mr Colin Cole' as HeroName,
-  inputType: 'keyboard',
+  roundTime: 90,
   scene,
-  animations: animationController.animations,
-  inputs: {
-    left: 'KeyA',
-    right: 'KeyD',
-    jump: 'Space',
-    attackUp: 'KeyG',
-    attackDown: 'KeyV',
-    block: 'KeyY',
-  },
 })
-
-const player2 = new Player({
-  playerName: 'Player 2',
-  domElement: renderer.domElement,
-  heroName: 'Mr Colin Cole' as HeroName,
-  inputType: 'keyboard',
-  scene,
-  animations: animationController.animations,
-  inputs: {
-    left: 'ArrowLeft',
-    right: 'ArrowRight',
-    jump: 'ControlRight',
-    attackUp: 'Equal',
-    attackDown: 'BracketRight',
-    block: 'Backslash',
-  },
-})
-
-player1.enemy = player2
-player2.enemy = player1
+await gameController.init()
 
 const controls = new OrbitControls(camera, renderer.domElement)
 
@@ -81,8 +46,7 @@ function animate() {
   const delta = clock.getDelta()
 
   controls.update()
-  player1.update(delta)
-  player2.update(delta)
+  gameController.update(delta)
 
   render()
 }
