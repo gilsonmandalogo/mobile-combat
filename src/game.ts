@@ -3,6 +3,7 @@ import type { HeroName } from '@src/hero'
 import Animations from '@src/animations'
 import { ErrorUndefinedProperty } from '@src/errors'
 import { updateDebug } from '@src/debug'
+import { settingsStore } from '@stores/settings'
 
 interface GameConstructor {
   roundTime: number
@@ -96,40 +97,24 @@ export default class Game {
 
     this._player1 = new Player({
       playerName: 'Player 1',
+      playerNumber: 'player1',
       domElement: this.domElement,
       heroName: 'Mr Colin Cole' as HeroName,
-      inputType: 'keyboard',
       scene: this.scene,
       animations: animationController.animations,
       leftSide: true,
       hitCallback: this.playerHit,
-      inputs: {
-        left: 'KeyA',
-        right: 'KeyD',
-        jump: 'Space',
-        attackUp: 'KeyG',
-        attackDown: 'KeyV',
-        block: 'KeyY',
-      },
     })
     
     this._player2 = new Player({
       playerName: 'Player 2',
+      playerNumber: 'player2',
       domElement: this.domElement,
       heroName: 'Mr Colin Cole' as HeroName,
-      inputType: 'keyboard',
       scene: this.scene,
       animations: animationController.animations,
       leftSide: false,
       hitCallback: this.playerHit,
-      inputs: {
-        left: 'ArrowLeft',
-        right: 'ArrowRight',
-        jump: 'ControlRight',
-        attackUp: 'Equal',
-        attackDown: 'BracketRight',
-        block: 'Backslash',
-      },
     })
 
     await Promise.all([
@@ -149,7 +134,9 @@ export default class Game {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
-    if (e.code === 'Escape') {
+    const { menu } = settingsStore.get().inputs
+
+    if (e.code === menu) {
       if (!['running', 'paused'].includes(this.gameStatus)) {
         return
       }

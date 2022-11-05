@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import Hero, { HeroName } from '@src/hero'
 import type { HeroConstructor } from '@src/hero'
+import { settingsStore } from '@src/stores/settings'
 
 type MrColinColeConstructor = Omit<HeroConstructor, 'name'>
 
@@ -41,6 +42,12 @@ export default class MrColinCole extends Hero {
     const rightHandCollider = handsCollider.clone()
     this._atttackMembersColliders.push(rightHandCollider)
     rightHandBone.add(rightHandCollider)
+
+    settingsStore.subscribe(({ debug }) => {
+      headCollider.visible = debug
+      leftHandBone.visible = debug
+      rightHandBone.visible = debug
+    })
 
     this._ready = true
 

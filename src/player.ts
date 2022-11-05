@@ -4,29 +4,19 @@ import type { HeroName } from '@src/hero'
 import { getHeroClassByName } from '@src/utils'
 import { updateDebug } from '@src/debug'
 import { ErrorUndefinedProperty } from '@src/errors'
+import { InputType, PlayerInputs, settingsStore } from '@stores/settings'
 
-type InputType = 'keyboard' | 'touch'
 type HitCallback = (player: Player) => void
-
-interface Inputs {
-  left: string
-  right: string
-  jump: string
-  attackUp: string
-  attackDown: string
-  block: string
-}
 
 interface PlayerConstructor {
   heroName: HeroName
-  inputs: Inputs
-  inputType: InputType
   domElement: HTMLElement
   scene: THREE.Scene
   animations: Record<string, THREE.AnimationClip>
   playerName: string
   leftSide: boolean
   hitCallback: HitCallback
+  playerNumber: 'player1' | 'player2'
 }
 
 export default class Player {
@@ -85,10 +75,18 @@ export default class Player {
     updateDebug(`${this.playerName} score`, value)
   }
 
+  private _inputs?: PlayerInputs
+  private get inputs() {
+    if (!this._inputs) {
+      throw new ErrorUndefinedProperty('inputs')
+    }
+
+    return this._inputs
+  }
+
   private velocityX = 0
   private velocityY = 0
-  private inputs: Inputs
-  private inputType: InputType
+  private inputType: InputType = 'keyboard'
   private domElement: HTMLElement
   private heroName: HeroName
   private scene: THREE.Scene
@@ -111,17 +109,14 @@ export default class Player {
 
   constructor({
     heroName,
-    inputs,
-    inputType,
     domElement,
     scene,
     animations,
     playerName,
     leftSide,
     hitCallback,
+    playerNumber,
   }: PlayerConstructor) {
-    this.inputs = inputs
-    this.inputType = inputType
     this.domElement = domElement
     this.heroName = heroName
     this.scene = scene
@@ -131,6 +126,14 @@ export default class Player {
     this.hitCallback = hitCallback
 
     this.life = this._life
+
+    settingsStore.subscribe(({ debug, inputs, inputType }) => {
+      this.boxColliderHelper.my.visible = debug
+      this.boxColliderHelper.enemy.visible = debug
+
+      this._inputs = inputs[playerNumber]
+      this.inputType = inputType
+    })
   }
 
   public async loadData() {
@@ -260,7 +263,6 @@ export default class Player {
     }
 
     this.animationMixer!.update(delta)
-    updateDebug(`${this.playerName} velocityX`, this.velocityX)
 
     const newPosition = new THREE.Vector3(this.velocityX * 0.1, this.velocityY * delta)
     this.hero.actor.position.add(newPosition)
