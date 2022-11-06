@@ -172,8 +172,10 @@ export default class Player {
 
     this.animationsActions['WalkForward'].timeScale = 1.5
     this.animationsActions['WalkBackward'].timeScale = 1.1
+    this.animationsActions['PunchUp'].timeScale = 1.3
     this.animationsActions['PunchUp'].clampWhenFinished = true
     this.animationsActions['PunchUp'].setLoop(THREE.LoopOnce, 1)
+    this.animationsActions['PunchDown'].timeScale = 1.2
     this.animationsActions['PunchDown'].clampWhenFinished = true
     this.animationsActions['PunchDown'].setLoop(THREE.LoopOnce, 1)
 
