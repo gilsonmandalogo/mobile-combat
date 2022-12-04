@@ -4,11 +4,10 @@ import Animations from '@src/animations'
 import { ErrorUndefinedProperty } from '@src/errors'
 import { updateDebug } from '@src/debug'
 import { settingsStore } from '@stores/settings'
+import { contextStore } from '@stores/context'
 
 interface GameConstructor {
   roundTime: number
-  domElement: HTMLElement
-  scene: THREE.Scene
 }
 
 export default class Game {
@@ -68,19 +67,14 @@ export default class Game {
     updateDebug('Round', value)
   }
 
-  private domElement: HTMLElement
-  private scene: THREE.Scene
+  private domElement = contextStore.get().canvas
   private roundTime: number
 
   constructor({
     roundTime,
-    domElement,
-    scene,
   }: GameConstructor) {
     this.roundTime = roundTime
     this._currentRoundTime = roundTime
-    this.domElement = domElement
-    this.scene = scene
 
     this.gameStatus = 'running'
 
@@ -98,9 +92,7 @@ export default class Game {
     this._player1 = new Player({
       playerName: 'Player 1',
       playerNumber: 'player1',
-      domElement: this.domElement,
       heroName: 'Mr Colin Cole' as HeroName,
-      scene: this.scene,
       animations: animationController.animations,
       leftSide: true,
       hitCallback: this.playerHit,
@@ -109,9 +101,7 @@ export default class Game {
     this._player2 = new Player({
       playerName: 'Player 2',
       playerNumber: 'player2',
-      domElement: this.domElement,
       heroName: 'Mr Colin Cole' as HeroName,
-      scene: this.scene,
       animations: animationController.animations,
       leftSide: false,
       hitCallback: this.playerHit,

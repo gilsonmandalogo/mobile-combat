@@ -12,7 +12,7 @@ export interface HeroConstructor {
   name: string
 }
 
-export default class Hero {
+export default abstract class Hero {
   protected _ready = false
   public get ready() {
     return this._ready

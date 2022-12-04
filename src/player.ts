@@ -5,13 +5,12 @@ import { getHeroClassByName } from '@src/utils'
 import { updateDebug } from '@src/debug'
 import { ErrorUndefinedProperty } from '@src/errors'
 import { InputType, PlayerInputs, settingsStore } from '@stores/settings'
+import { contextStore } from '@stores/context'
 
 type HitCallback = (player: Player) => void
 
 interface PlayerConstructor {
   heroName: HeroName
-  domElement: HTMLElement
-  scene: THREE.Scene
   animations: Record<string, THREE.AnimationClip>
   playerName: string
   leftSide: boolean
@@ -84,14 +83,22 @@ export default class Player {
     return this._inputs
   }
 
+  private _animationMixer?: THREE.AnimationMixer
+  public get animationMixer() {
+    if (!this._animationMixer) {
+      throw new ErrorUndefinedProperty('animationMixer')
+    }
+
+    return this._animationMixer
+  }
+
   private velocityX = 0
   private velocityY = 0
   private inputType: InputType = 'keyboard'
-  private domElement: HTMLElement
+  private domElement = contextStore.get().canvas
   private heroName: HeroName
-  private scene: THREE.Scene
+  private scene = contextStore.get().scene
   private animations: Record<string, THREE.AnimationClip>
-  private animationMixer?: THREE.AnimationMixer
   private animationsActions: Record<string, THREE.AnimationAction> = {}
   private currentAnimation = 'Idle'
   private isPunching = false
@@ -109,17 +116,13 @@ export default class Player {
 
   constructor({
     heroName,
-    domElement,
-    scene,
     animations,
     playerName,
     leftSide,
     hitCallback,
     playerNumber,
   }: PlayerConstructor) {
-    this.domElement = domElement
     this.heroName = heroName
-    this.scene = scene
     this.animations = animations
     this._playerName = playerName
     this.leftSide = leftSide
@@ -149,7 +152,7 @@ export default class Player {
       this.domElement.addEventListener('keyup', this.onKeyUp)
     }
 
-    this.animationMixer = new THREE.AnimationMixer(heroMesh.scene)
+    this._animationMixer = new THREE.AnimationMixer(heroMesh.scene)
 
     this.animationMixer.addEventListener('finished', (e) => {
       if (
@@ -204,54 +207,54 @@ export default class Player {
 
   private onKeyDown = (e: KeyboardEvent) => {
     switch (e.code) {
-      case this.inputs.left:
-        this.changeAnimation(this.leftSide ? 'WalkBackward' : 'WalkForward')
-        this.velocityX = -1
-        break
-      case this.inputs.right:
-        this.changeAnimation(this.leftSide ? 'WalkForward' : 'WalkBackward')
-        this.velocityX = 1
-        break
-      case this.inputs.jump:
-        if (this.velocityY === 0) {
-          this.velocityY = 1
-        }
-        break
-      case this.inputs.attackUp:
-        if (!this.canPunch()) {
-          return
-        }
-        this.changeAnimation('PunchUp')
-        this.isPunching = true
-        break;
-      case this.inputs.attackDown:
-        if (!this.canPunch()) {
-          return
-        }
-        this.changeAnimation('PunchDown')
-        this.isPunching = true
-        break
-      default:
-        break
+    case this.inputs.left:
+      this.changeAnimation(this.leftSide ? 'WalkBackward' : 'WalkForward')
+      this.velocityX = -1
+      break
+    case this.inputs.right:
+      this.changeAnimation(this.leftSide ? 'WalkForward' : 'WalkBackward')
+      this.velocityX = 1
+      break
+    case this.inputs.jump:
+      if (this.velocityY === 0) {
+        this.velocityY = 1
+      }
+      break
+    case this.inputs.attackUp:
+      if (!this.canPunch()) {
+        return
+      }
+      this.changeAnimation('PunchUp')
+      this.isPunching = true
+      break
+    case this.inputs.attackDown:
+      if (!this.canPunch()) {
+        return
+      }
+      this.changeAnimation('PunchDown')
+      this.isPunching = true
+      break
+    default:
+      break
     }
   }
 
   private onKeyUp = (e: KeyboardEvent) => {
     switch (e.code) {
-      case this.inputs.left:
-        if (this.velocityX === -1) {
-          this.changeAnimation('Idle')
-          this.velocityX = 0
-        }
-        break;
-      case this.inputs.right:
-        if (this.velocityX === 1) {
-          this.changeAnimation('Idle')
-          this.velocityX = 0
-        }
-        break;
-      default:
-        break;
+    case this.inputs.left:
+      if (this.velocityX === -1) {
+        this.changeAnimation('Idle')
+        this.velocityX = 0
+      }
+      break
+    case this.inputs.right:
+      if (this.velocityX === 1) {
+        this.changeAnimation('Idle')
+        this.velocityX = 0
+      }
+      break
+    default:
+      break
     }
   }
 
@@ -264,7 +267,7 @@ export default class Player {
       return
     }
 
-    this.animationMixer!.update(delta)
+    this.animationMixer.update(delta)
 
     const newPosition = new THREE.Vector3(this.velocityX * 0.1, this.velocityY * delta)
     this.hero.actor.position.add(newPosition)

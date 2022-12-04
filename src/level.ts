@@ -1,23 +1,16 @@
-import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 
-type LevelName = 'Mayan-Temple'
+export const allLevels = ['Mayan-Temple'] as const
+export type LevelName = typeof allLevels[number]
 
-export default class Level {
-  public async loadLevel(name: LevelName) {
+export default abstract class Level {
+  protected abstract levelName: LevelName
+
+  public async loadLevel() {
     const loader = new GLTFLoader()
-    const model = await loader.loadAsync(`assets/models/${name}.glb`)
-    model.scene.traverse(child => {
-      if (child instanceof THREE.Mesh && child.isMesh) {
-        child.receiveShadow = true
-        child.castShadow = true
-      }
-      
-      if (child instanceof THREE.Light && child.isLight) {
-        child.castShadow = true
-        child.shadow.bias = -0.001
-      }
-    })
+    const model = await loader.loadAsync(`assets/models/${this.levelName}.glb`)
     return model
   }
+
+  public abstract update(delta: number): void
 }

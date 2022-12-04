@@ -7,6 +7,8 @@
       "@src/*": ["src/*"],
       "@heroes/*": ["src/heroes/*"],
       "@stores/*": ["src/stores/*"],
+      "@levels/*": ["src/levels/*"],
+      "@particles/*": ["src/particles/*"],
     }
   }
 }

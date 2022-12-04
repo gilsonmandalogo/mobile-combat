@@ -1,19 +1,23 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
-import Level from '@src/level'
 import Game from '@src/game'
+import { contextStore } from '@stores/context'
+import { getLevelClassByName } from '@src/utils'
 
 const scene = new THREE.Scene()
+contextStore.setKey('scene', scene)
 
 const renderer = new THREE.WebGLRenderer()
+contextStore.setKey('canvas', renderer.domElement)
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.domElement.tabIndex = 0
 document.body.appendChild(renderer.domElement)
 
-const levelController = new Level()
-const level = await levelController.loadLevel('Mayan-Temple')
+const levelClass = getLevelClassByName('Mayan-Temple')
+const levelController = new levelClass()
+const level = await levelController.loadLevel()
 scene.add(level.scene)
 
 const camera = level.cameras[0] as THREE.PerspectiveCamera
@@ -21,9 +25,7 @@ camera.aspect = window.innerWidth / window.innerHeight
 camera.updateProjectionMatrix()
 
 const gameController = new Game({
-  domElement: renderer.domElement,
   roundTime: 90,
-  scene,
 })
 await gameController.init()
 
@@ -47,6 +49,7 @@ function animate() {
 
   controls.update()
   gameController.update(delta)
+  levelController.update(delta)
 
   render()
 }
