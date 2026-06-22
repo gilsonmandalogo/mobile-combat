@@ -1,5 +1,6 @@
 import type * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { assetUrl } from '@src/utils'
 
 const ANIMATION_FILES = ['Idle', 'WalkForward', 'WalkBackward', 'PunchUp', 'PunchDown']
 
@@ -13,7 +14,7 @@ export default class Animations {
     const loader = new GLTFLoader()
 
     for (const file of ANIMATION_FILES) {
-      const gltf = await loader.loadAsync(`assets/animations/${file}.glb`)
+      const gltf = await loader.loadAsync(assetUrl(`assets/animations/${file}.glb`))
       this._animations = {
         ...this._animations,
         [file]: gltf.animations[0],
