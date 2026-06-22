@@ -1,4 +1,5 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
+import { assetUrl } from '@src/utils'
 
 export const allLevels = ['Mayan-Temple'] as const
 export type LevelName = typeof allLevels[number]
@@ -8,7 +9,7 @@ export default abstract class Level {
 
   public async loadLevel() {
     const loader = new GLTFLoader()
-    const model = await loader.loadAsync(`assets/models/${this.levelName}.glb`)
+    const model = await loader.loadAsync(assetUrl(`assets/models/${this.levelName}.glb`))
     return model
   }
 

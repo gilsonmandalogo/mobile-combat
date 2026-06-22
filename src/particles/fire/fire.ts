@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { assetUrl } from '@src/utils'
 import vertexShader from './vertex.glsl?raw'
 import fragmentShader from './fragment.glsl?raw'
 
@@ -38,7 +39,7 @@ export default class FireParticleSystem {
   constructor(params: FireParticleSystemConstructor) {
     const uniforms = {
       diffuseTexture: {
-        value: new THREE.TextureLoader().load('assets/textures/fire.png')
+        value: new THREE.TextureLoader().load(assetUrl('assets/textures/fire.png'))
       },
       pointMultiplier: {
         value: window.innerHeight / (2.0 * Math.tan(0.5 * 120.0 * Math.PI / 180.0))

@@ -1,4 +1,9 @@
 import type { HeroName } from '@src/hero'
+
+export function assetUrl(path: string) {
+  return `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+}
+
 import MrColinCole from '@heroes/MrColinCole'
 import type { LevelName } from '@src/level'
 import MayanTempleLevel from '@levels/mayanTemple'

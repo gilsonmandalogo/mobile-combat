@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { ErrorUndefinedProperty } from '@src/errors'
+import { assetUrl } from '@src/utils'
 
 export enum HeroName {
   MrColinCole = 'Mr Colin Cole',
@@ -68,7 +69,7 @@ export default abstract class Hero {
 
   public async loadMesh() {
     const loader = new GLTFLoader()
-    const model = await loader.loadAsync(`assets/models/${this.name.replaceAll(' ', '-')}.glb`)
+    const model = await loader.loadAsync(assetUrl(`assets/models/${this.name.replaceAll(' ', '-')}.glb`))
 
     model.scene.traverse(child => {
       if (child instanceof THREE.Mesh && child.isMesh) {
