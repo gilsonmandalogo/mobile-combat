@@ -18,6 +18,7 @@ import type { HapticGamepad, PadSnapshot } from '@src/input/gamepad'
 import { createAiMemory, stepAi } from '@src/ai/opponent'
 import type { AiMemory } from '@src/ai/opponent'
 import { EMPTY_INTENT } from '@src/sim/types'
+import { AudioEngine } from '@src/audio/engine'
 import type { PlayerSlot } from '@src/settings/schema'
 
 interface GameConstructor {
@@ -36,6 +37,7 @@ export default class Game {
   private padButtons: Record<PlayerSlot, boolean[]> = { player1: [], player2: [] }
   private ready = false
   private ai: AiMemory | null = null
+  private audio = new AudioEngine()
   private shell?: Shell
   private roundTime: number
   private hurtBoxes = [new THREE.Box3(), new THREE.Box3()]
@@ -47,6 +49,13 @@ export default class Game {
     this.roundTime = roundTime
     this.keyboard = new KeyboardTracker(window)
     this.match = this.freshMatch()
+    window.addEventListener('pointerdown', (event) => {
+      this.audio.unlock()
+      const target = event.target
+      if (target instanceof Element && target.closest('button')) {
+        this.audio.play('menu')
+      }
+    })
 
     const scene = contextStore.get().scene
     this.hurtHelpers = this.hurtBoxes.map((box) => new THREE.Box3Helper(box, new THREE.Color('#5cff7a')))
@@ -152,6 +161,10 @@ export default class Game {
     }
 
     const status = this.match.status
+    const audible = settingsStore.get()
+    this.audio.setVolumes(audible.musicVolume, audible.sfxVolume)
+    this.audio.setMusic(status !== 'menu')
+    this.audio.update(dt)
     const simulate = status !== 'paused' && status !== 'menu' && status !== 'matchEnd'
     const intents = this.pollIntents(dt, simulate)
     if (!simulate) {
@@ -250,9 +263,26 @@ export default class Game {
   }
 
   private onEvent(event: GameEvent) {
+    if (event.type === 'attack') {
+      this.audio.play('attack')
+      return
+    }
+    if (event.type === 'ko') {
+      this.audio.play('ko')
+      return
+    }
+    if (event.type === 'roundStart') {
+      this.audio.play('round')
+      return
+    }
+    if (event.type === 'matchEnd') {
+      this.audio.play('win')
+      return
+    }
     if (event.type !== 'hit') {
       return
     }
+    this.audio.play(event.blocked ? 'block' : 'hit')
     this.flash[event.defender] = 0.16
     const strength = event.blocked ? 0.35 : 0.9
     this.rumble(event.defender, strength, event.blocked ? 0.2 : 0.45, event.blocked ? 70 : 150)
@@ -314,6 +344,7 @@ export default class Game {
           left -= step
         }
       },
+      getAudio: () => this.audio.snapshot(),
       setVirtualGamepad: (pad: PadSnapshot | null) => {
         if (!pad) {
           this.virtualPads = []

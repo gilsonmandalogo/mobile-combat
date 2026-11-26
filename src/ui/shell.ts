@@ -139,6 +139,29 @@ export class Shell {
     return Boolean(panel && !panel.hidden)
   }
 
+  private renderVolumes(body: HTMLElement, settings: ReturnType<typeof settingsStore.get>) {
+    const group = document.createElement('div')
+    group.className = 'volumes'
+    for (const [key, label] of [['musicVolume', 'Music'], ['sfxVolume', 'Effects']] as const) {
+      const row = document.createElement('label')
+      row.textContent = label
+      const input = document.createElement('input')
+      input.type = 'range'
+      input.min = '0'
+      input.max = '1'
+      input.step = '0.05'
+      input.value = String(settings[key])
+      input.dataset.testid = key
+      input.addEventListener('input', () => {
+        const current = settingsStore.get()
+        settingsStore.set({ ...current, [key]: Number(input.value) })
+      })
+      row.append(input)
+      group.append(row)
+    }
+    body.append(group)
+  }
+
   private renderSettings() {
     const body = document.getElementById('settings-body')
     if (!body) {
@@ -146,6 +169,7 @@ export class Shell {
     }
     body.replaceChildren()
     const settings = settingsStore.get()
+    this.renderVolumes(body, settings)
     const note = document.createElement('p')
     note.className = 'note'
     note.textContent = 'Keyboard and gamepad bindings for this browser.'

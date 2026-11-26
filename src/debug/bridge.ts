@@ -1,3 +1,4 @@
+import type { AudioSnapshot } from '@src/audio/engine'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 import type { PadSnapshot } from '@src/input/gamepad'
 import type { FighterId, Intent } from '@src/sim/types'
@@ -7,6 +8,7 @@ export interface DebugApi {
   getState: () => DebugSnapshot
   setIntent: (id: FighterId, intent: Intent | null) => void
   stepFor: (seconds: number) => void
+  getAudio: () => AudioSnapshot
   setVirtualGamepad: (pad: PadSnapshot | null) => void
 }
 
