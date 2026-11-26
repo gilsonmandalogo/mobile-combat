@@ -5,6 +5,7 @@ import { getHeroClassByName } from '@src/utils'
 import { updateDebug } from '@src/debug'
 import { ErrorUndefinedProperty } from '@src/errors'
 import { InputType, PlayerInputs, settingsStore } from '@stores/settings'
+import { applyLifeDamage, shouldRegisterHit } from '@src/sim/legacyRules'
 import { contextStore } from '@stores/context'
 
 type HitCallback = (player: Player) => void
@@ -259,7 +260,7 @@ export default class Player {
   }
 
   public hit(damage: number) {
-    this.life -= damage
+    this.life = applyLifeDamage(this.life, damage)
   }
 
   public update(delta: number) {
@@ -282,12 +283,14 @@ export default class Player {
       for (const collider of this.hero.atttackMembersColliders) {
         this.boxCollider.my.setFromObject(collider)
 
-        if (this.boxCollider.my.intersectsBox(this.boxCollider.enemy)) {
-          if (!this.isHitting) {
-            this.isHitting = true
-            this.enemy.hit(this.hero.attackDamage)
-            break
-          }
+        if (shouldRegisterHit(
+          true,
+          this.isHitting,
+          this.boxCollider.my.intersectsBox(this.boxCollider.enemy),
+        )) {
+          this.isHitting = true
+          this.enemy.hit(this.hero.attackDamage)
+          break
         }
       }
     }

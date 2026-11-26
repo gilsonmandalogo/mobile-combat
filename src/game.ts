@@ -5,6 +5,8 @@ import { ErrorUndefinedProperty } from '@src/errors'
 import { updateDebug } from '@src/debug'
 import { settingsStore } from '@stores/settings'
 import { contextStore } from '@stores/context'
+import { advanceAfterRound, winnerByLife } from '@src/sim/legacyRules'
+import type { DebugState } from '@src/debug/bridge'
 
 interface GameConstructor {
   roundTime: number
@@ -47,9 +49,8 @@ export default class Game {
       this._currentRoundTime = value
       updateDebug('Round time', value)
     } else {
-      const winner = this.player1.life >= this.player2.life ? this.player1 : this.player2
-      winner.score++
-      this.endTurn(`${winner.playerName} wins`)
+      const winner = winnerByLife(this.player1.life, this.player2.life)
+      this.applyRoundResult(winner, `${winner === 'player1' ? this.player1.playerName : this.player2.playerName} wins`)
     }
   }
 
@@ -135,32 +136,46 @@ export default class Game {
     }
   }
 
-  private playerHit = (player: Player) => {
-    if (player.life <= 0) {
-      player.enemy.score++
-      this.endTurn(`${player.enemy.playerName} wins`)
+  public getDebugState(): DebugState {
+    return {
+      ready: Boolean(this._player1 && this._player2),
+      status: this.gameStatus,
+      round: this.currentRound,
+      timeLeft: this.currentRoundTime,
+      life: {
+        player1: this._player1?.life ?? 0,
+        player2: this._player2?.life ?? 0,
+      },
+      score: {
+        player1: this._player1?.score ?? 0,
+        player2: this._player2?.score ?? 0,
+      },
     }
   }
 
-  private endTurn(reason: string) {
+  private playerHit = (player: Player) => {
+    if (player.life <= 0) {
+      const winner = player === this.player1 ? 'player2' : 'player1'
+      this.applyRoundResult(winner, `${player.enemy.playerName} wins`)
+    }
+  }
+
+  private applyRoundResult(winner: 'player1' | 'player2', reason: string) {
     console.log(reason)
-    
-    if (this.currentRound === 1) {
-      this.currentRound++
+    const result = advanceAfterRound({
+      round: this.currentRound,
+      score1: this.player1.score,
+      score2: this.player2.score,
+    }, winner)
+    this.player1.score = result.score1
+    this.player2.score = result.score2
+
+    if (result.kind === 'match') {
+      this.endGame()
       return
     }
 
-    if (this.currentRound === 2) {
-      if (this.player1.score === 2 || this.player2.score === 2) {
-        this.endGame()
-        return
-      }
-
-      this.currentRound++
-      return
-    }
-
-    this.endGame()
+    this.currentRound = result.round
   }
 
   private endGame() {

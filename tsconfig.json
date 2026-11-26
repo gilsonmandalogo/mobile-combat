@@ -1,7 +1,8 @@
 {
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
-    "types": ["astro/client"],
+    "types": ["astro/client", "node"],
+    "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "@src/*": ["src/*"],
@@ -10,5 +11,6 @@
       "@levels/*": ["src/levels/*"],
       "@particles/*": ["src/particles/*"],
     }
-  }
+  },
+  "include": ["src", "tests/unit"]
 }

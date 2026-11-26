@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import Game from '@src/game'
 import { contextStore } from '@stores/context'
 import { getLevelClassByName } from '@src/utils'
+import { publishDebugApi } from '@src/debug/bridge'
 
 const scene = new THREE.Scene()
 contextStore.setKey('scene', scene)
@@ -13,6 +14,7 @@ renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.domElement.tabIndex = 0
+renderer.domElement.dataset.testid = 'game-canvas'
 document.body.appendChild(renderer.domElement)
 
 const levelClass = getLevelClassByName('Mayan-Temple')
@@ -28,6 +30,10 @@ const gameController = new Game({
   roundTime: 90,
 })
 await gameController.init()
+publishDebugApi({
+  ready: true,
+  getState: () => gameController.getDebugState(),
+})
 
 const controls = new OrbitControls(camera, renderer.domElement)
 
