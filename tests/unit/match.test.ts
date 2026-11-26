@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ATTACKS, ROUND_END_DELAY } from '@src/sim/constants'
-import { createMatch, pauseMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
+import { createMatch, pauseMatch, quitToMenu, restartMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
 import { EMPTY_INTENT } from '@src/sim/types'
 import type { FighterId, Intent, MatchState } from '@src/sim/types'
 
@@ -153,6 +153,28 @@ describe('match simulation', () => {
     expect(result.state.roundWinner).toBe('player2')
     expect(result.state.fighters[1].score).toBe(1)
     expect(result.state.banner).toBe('Blue takes the round')
+  })
+
+  it('restarts the score and returns to the menu without dropping the roster', () => {
+    let state = fight()
+    state = {
+      ...state,
+      fighters: [
+        { ...state.fighters[0], score: 1, life: 10 },
+        state.fighters[1],
+      ],
+    }
+    const restarted = restartMatch(state)
+    expect(restarted.status).toBe('running')
+    expect(restarted.round).toBe(1)
+    expect(restarted.fighters[0].score).toBe(0)
+    expect(restarted.fighters[0].life).toBe(100)
+    expect(restarted.fighters[0].name).toBe('Red')
+
+    const menu = quitToMenu(restarted)
+    expect(menu.status).toBe('menu')
+    expect(menu.fighters[1].name).toBe('Blue')
+    expect(menu.mode).toBe('local')
   })
 
   it('does not advance the clock while paused', () => {

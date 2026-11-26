@@ -69,6 +69,28 @@ export function createMatch(options: MatchOptions): MatchState {
   }
 }
 
+export function restartMatch(state: MatchState): MatchState {
+  return startMatch(createMatch({
+    mode: state.mode,
+    difficulty: state.difficulty,
+    roundTime: state.roundTime,
+    names: [state.fighters[0].name, state.fighters[1].name],
+    devices: [state.fighters[0].device, state.fighters[1].device],
+    seed: state.seed,
+  })).state
+}
+
+export function quitToMenu(state: MatchState): MatchState {
+  return createMatch({
+    mode: state.mode,
+    difficulty: state.difficulty,
+    roundTime: state.roundTime,
+    names: [state.fighters[0].name, state.fighters[1].name],
+    devices: [state.fighters[0].device, state.fighters[1].device],
+    seed: state.seed,
+  })
+}
+
 export function startMatch(state: MatchState): StepResult {
   const reset = startRound({
     ...state,

@@ -55,6 +55,23 @@ import '@src/styles.css'
           <button id="start-match" data-testid="start-match" type="button" disabled>Loading arena…</button>
         </div>
       </section>
+      <section id="pause-menu" class="panel" data-testid="pause-menu" hidden>
+        <h2>Paused</h2>
+        <p class="tagline">The round clock is stopped.</p>
+        <div class="menu-actions">
+          <button id="resume" data-testid="resume" type="button">Resume</button>
+          <button id="restart" data-testid="restart" type="button">Restart</button>
+          <button id="pause-settings" data-testid="pause-settings" type="button">Settings</button>
+          <button id="quit" data-testid="quit" type="button">Quit to menu</button>
+        </div>
+      </section>
+      <section id="settings-panel" class="panel settings-panel" data-testid="settings-panel" hidden>
+        <h2>Settings</h2>
+        <div id="settings-body"></div>
+        <div class="menu-actions">
+          <button id="close-settings" data-testid="close-settings" type="button">Back</button>
+        </div>
+      </section>
     </div>
     <pre id="debug"></pre>
   </body>

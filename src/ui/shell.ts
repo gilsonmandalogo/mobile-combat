@@ -5,10 +5,14 @@ import type { Difficulty, MatchMode } from '@src/sim/types'
 
 export interface MatchHost {
   beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number }) => void
+  resume: () => void
+  restart: () => void
+  quitToMenu: () => void
 }
 
 export class Shell {
   private ready = false
+  private lastState: DebugSnapshot | null = null
 
   constructor(private host: MatchHost) {}
 
@@ -22,6 +26,12 @@ export class Shell {
     }
     mode.addEventListener('change', syncMode)
     syncMode()
+
+    this.bindClick('resume', () => this.host.resume())
+    this.bindClick('restart', () => this.host.restart())
+    this.bindClick('quit', () => this.host.quitToMenu())
+    this.bindClick('pause-settings', () => this.showSettings(true))
+    this.bindClick('close-settings', () => this.showSettings(false))
 
     this.required<HTMLButtonElement>('start-match').addEventListener('click', () => {
       if (!this.ready) {
@@ -55,7 +65,61 @@ export class Shell {
   }
 
   render(state: DebugSnapshot) {
-    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu'
+    this.lastState = state
+    const settingsOpen = this.settingsOpen()
+    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu' || settingsOpen
+    const pause = document.getElementById('pause-menu')
+    if (pause) {
+      pause.hidden = state.status !== 'paused' || settingsOpen
+    }
+  }
+
+  showSettings(show: boolean) {
+    const panel = document.getElementById('settings-panel')
+    if (!panel) {
+      return
+    }
+    if (show) {
+      this.renderSettings()
+    }
+    panel.hidden = !show
+    if (this.lastState) {
+      this.render(this.lastState)
+    }
+  }
+
+  settingsOpen(): boolean {
+    const panel = document.getElementById('settings-panel')
+    return Boolean(panel && !panel.hidden)
+  }
+
+  private renderSettings() {
+    const body = document.getElementById('settings-body')
+    if (!body) {
+      return
+    }
+    body.replaceChildren()
+    const settings = settingsStore.get()
+    const note = document.createElement('p')
+    note.className = 'note'
+    note.textContent = 'Keyboard and gamepad bindings for this browser.'
+    body.append(note)
+    for (const slot of ['player1', 'player2'] as const) {
+      const player = settings.players[slot]
+      const heading = document.createElement('h3')
+      heading.textContent = player.name
+      const list = document.createElement('ul')
+      for (const [action, code] of Object.entries(player.keys)) {
+        const item = document.createElement('li')
+        item.textContent = `${action}: ${code}`
+        list.append(item)
+      }
+      body.append(heading, list)
+    }
+  }
+
+  private bindClick(id: string, action: () => void) {
+    document.getElementById(id)?.addEventListener('click', action)
   }
 
   private persistSetup(setup: ReturnType<typeof readMatchSetup>) {

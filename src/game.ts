@@ -9,7 +9,7 @@ import { publishDebugApi } from '@src/debug/bridge'
 import { snapshotMatch } from '@src/debug/snapshot'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 import { hitbox, hurtbox } from '@src/sim/hitboxes'
-import { createMatch, pauseMatch, resumeMatch, startMatch, stepMatch } from '@src/sim/match'
+import { createMatch, pauseMatch, quitToMenu as menuState, restartMatch, resumeMatch, startMatch, stepMatch } from '@src/sim/match'
 import type { Aabb, Difficulty, FighterId, GameEvent, Intent, MatchMode, MatchState } from '@src/sim/types'
 import { KeyboardTracker, keyboardIntent } from '@src/input/keyboard'
 import type { Shell } from '@src/ui/shell'
@@ -117,6 +117,24 @@ export default class Game {
     this.present(false, 0)
   }
 
+  public resume() {
+    this.match = resumeMatch(this.match)
+    this.present(false, 0)
+  }
+
+  public restart() {
+    this.forced = { player1: null, player2: null }
+    this.match = restartMatch(this.match)
+    this.present(false, 0)
+  }
+
+  public quitToMenu() {
+    this.shell?.showSettings(false)
+    this.forced = { player1: null, player2: null }
+    this.match = menuState(this.match)
+    this.present(false, 0)
+  }
+
   public update(delta: number) {
     this.tick(Math.min(Math.max(delta, 0), 0.05))
   }
@@ -162,7 +180,11 @@ export default class Game {
     const settings = settingsStore.get()
     const edges = this.keyboard.consumeEdges()
     if (edges.has(settings.menuKey)) {
-      this.togglePause()
+      if (this.shell?.settingsOpen()) {
+        this.shell.showSettings(false)
+      } else {
+        this.togglePause()
+      }
     }
 
     const native = typeof navigator !== 'undefined' && navigator.getGamepads
