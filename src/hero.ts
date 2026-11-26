@@ -8,8 +8,6 @@ export enum HeroName {
 }
 
 export interface HeroConstructor {
-  attackDamage?: number
-  blockPower?: number
   name: string
 }
 
@@ -17,16 +15,6 @@ export default abstract class Hero {
   protected _ready = false
   public get ready() {
     return this._ready
-  }
-
-  private _attackDamage: number
-  public get attackDamage() {
-    return this._attackDamage
-  }
-
-  private _blockPower: number
-  public get blockPower() {
-    return this._blockPower
   }
 
   private _name: string
@@ -52,18 +40,7 @@ export default abstract class Hero {
     return this._actor
   }
 
-  protected _atttackMembersColliders: Array<THREE.Mesh> = []
-  public get atttackMembersColliders() {
-    return this._atttackMembersColliders
-  }
-
-  constructor({
-    attackDamage = 5,
-    blockPower = 1,
-    name,
-  }: HeroConstructor) {
-    this._attackDamage = attackDamage
-    this._blockPower = blockPower
+  constructor({ name }: HeroConstructor) {
     this._name = name
   }
 

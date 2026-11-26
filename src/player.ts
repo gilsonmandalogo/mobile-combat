@@ -1,46 +1,43 @@
 import * as THREE from 'three'
-import type Hero from '@src/hero'
 import type { HeroName } from '@src/hero'
+import type Hero from '@src/hero'
 import { getHeroClassByName } from '@src/utils'
-import { updateDebug } from '@src/debug'
 import { ErrorUndefinedProperty } from '@src/errors'
-import { InputType, PlayerInputs, settingsStore } from '@stores/settings'
-import { applyLifeDamage, shouldRegisterHit } from '@src/sim/legacyRules'
 import { contextStore } from '@stores/context'
+import type { FighterState } from '@src/sim/types'
 
-type HitCallback = (player: Player) => void
+const PUNCH_CLIPS = new Set(['PunchUp', 'PunchDown'])
+
+function clipFor(state: FighterState): string {
+  if (state.action === 'attackUp') {
+    return 'PunchUp'
+  }
+  if (state.action === 'attackDown') {
+    return 'PunchDown'
+  }
+  if (state.action === 'walk') {
+    if (Math.sign(state.vx) === state.facing) {
+      return 'WalkForward'
+    }
+    if (Math.sign(state.vx) === -state.facing) {
+      return 'WalkBackward'
+    }
+  }
+  return 'Idle'
+}
 
 interface PlayerConstructor {
   heroName: HeroName
   animations: Record<string, THREE.AnimationClip>
   playerName: string
-  leftSide: boolean
-  hitCallback: HitCallback
-  playerNumber: 'player1' | 'player2'
 }
 
 export default class Player {
-  private _maxLife = 100
-  public get maxLife() {
-    return this._maxLife
-  }
-
-  private _life = this.maxLife
-  public get life() {
-    return this._life
-  }
-  public set life(value) {
-    this._life = value
-    updateDebug(`${this.playerName} life`, value)
-    this.hitCallback(this)
-  }
-
   private _hero?: Hero
   public get hero() {
     if (!this._hero) {
       throw new ErrorUndefinedProperty('hero')
     }
-
     return this._hero
   }
 
@@ -49,95 +46,19 @@ export default class Player {
     return this._ready
   }
 
-  private _enemy?: Player
-  public get enemy() {
-    if (!this._enemy) {
-      throw new ErrorUndefinedProperty('enemy')
-    }
-
-    return this._enemy
-  }
-  public set enemy(value: Player) {
-    this._enemy = value
-  }
-
-  private _playerName: string
-  public get playerName() {
-    return this._playerName
-  }
-
-  private _score = 0
-  public get score() {
-    return this._score
-  }
-  public set score(value) {
-    this._score = value
-    updateDebug(`${this.playerName} score`, value)
-  }
-
-  private _inputs?: PlayerInputs
-  private get inputs() {
-    if (!this._inputs) {
-      throw new ErrorUndefinedProperty('inputs')
-    }
-
-    return this._inputs
-  }
-
-  private _animationMixer?: THREE.AnimationMixer
-  public get animationMixer() {
-    if (!this._animationMixer) {
-      throw new ErrorUndefinedProperty('animationMixer')
-    }
-
-    return this._animationMixer
-  }
-
-  private velocityX = 0
-  private velocityY = 0
-  private inputType: InputType = 'keyboard'
-  private domElement = contextStore.get().canvas
-  private heroName: HeroName
+  readonly playerName: string
   private scene = contextStore.get().scene
   private animations: Record<string, THREE.AnimationClip>
-  private animationsActions: Record<string, THREE.AnimationAction> = {}
+  private heroName: HeroName
+  private animationMixer?: THREE.AnimationMixer
+  private clips: Record<string, THREE.AnimationAction> = {}
   private currentAnimation = 'Idle'
-  private isPunching = false
-  private isHitting = false
-  private leftSide: boolean
-  private hitCallback: HitCallback
-  private boxCollider = {
-    my: new THREE.Box3(),
-    enemy: new THREE.Box3(),
-  }
-  private boxColliderHelper = {
-    my: new THREE.Box3Helper(this.boxCollider.my, new THREE.Color('red')),
-    enemy: new THREE.Box3Helper(this.boxCollider.enemy, new THREE.Color('red')),
-  }
+  private emissive = new Map<THREE.Material, { color: THREE.Color; intensity: number }>()
 
-  constructor({
-    heroName,
-    animations,
-    playerName,
-    leftSide,
-    hitCallback,
-    playerNumber,
-  }: PlayerConstructor) {
+  constructor({ heroName, animations, playerName }: PlayerConstructor) {
     this.heroName = heroName
     this.animations = animations
-    this._playerName = playerName
-    this.leftSide = leftSide
-    this.hitCallback = hitCallback
-
-    this.life = this._life
-
-    settingsStore.subscribe(({ debug, inputs, inputType }) => {
-      this.boxColliderHelper.my.visible = debug
-      this.boxColliderHelper.enemy.visible = debug
-
-      this._inputs = inputs[playerNumber]
-      this.inputType = inputType
-    })
+    this.playerName = playerName
   }
 
   public async loadData() {
@@ -145,154 +66,106 @@ export default class Player {
     this._hero = new heroClass({})
     const heroMesh = await this.hero.loadMesh()
     this.scene.add(heroMesh.scene)
-    this.scene.add(this.boxColliderHelper.my)
-    this.scene.add(this.boxColliderHelper.enemy)
+    this.rememberMaterials(heroMesh.scene)
 
-    if (this.inputType === 'keyboard') {
-      this.domElement.addEventListener('keydown', this.onKeyDown)
-      this.domElement.addEventListener('keyup', this.onKeyUp)
+    this.animationMixer = new THREE.AnimationMixer(heroMesh.scene)
+    for (const [name, clip] of Object.entries(this.animations)) {
+      const action = this.animationMixer.clipAction(clip)
+      if (PUNCH_CLIPS.has(name)) {
+        action.clampWhenFinished = true
+        action.setLoop(THREE.LoopOnce, 1)
+      }
+      this.clips[name] = action
     }
 
-    this._animationMixer = new THREE.AnimationMixer(heroMesh.scene)
-
-    this.animationMixer.addEventListener('finished', (e) => {
-      if (
-        e.action === this.animationsActions['PunchUp'] ||
-        e.action === this.animationsActions['PunchDown']
-      ) {
-        this.changeAnimation('Idle')
-        this.isPunching = false
-        this.isHitting = false
-      }
-    })
-
-    for (const [animationName, animationClip] of Object.entries(this.animations)) {
-      const animationAction = this.animationMixer.clipAction(animationClip)
-      this.animationsActions = {
-        ...this.animationsActions,
-        [animationName]: animationAction,
-      }
-    }
-
-    this.animationsActions['WalkForward'].timeScale = 1.5
-    this.animationsActions['WalkBackward'].timeScale = 1.1
-    this.animationsActions['PunchUp'].timeScale = 1.3
-    this.animationsActions['PunchUp'].clampWhenFinished = true
-    this.animationsActions['PunchUp'].setLoop(THREE.LoopOnce, 1)
-    this.animationsActions['PunchDown'].timeScale = 1.2
-    this.animationsActions['PunchDown'].clampWhenFinished = true
-    this.animationsActions['PunchDown'].setLoop(THREE.LoopOnce, 1)
-
-    this.animationsActions[this.currentAnimation].play()
-
+    this.clips['WalkForward'].timeScale = 1.5
+    this.clips['WalkBackward'].timeScale = 1.1
+    this.clips['PunchUp'].timeScale = 1.35
+    this.clips['PunchDown'].timeScale = 1.25
+    this.clips[this.currentAnimation].play()
     this._ready = true
   }
 
-  private changeAnimation(actionName: string) {
-    if (actionName === this.currentAnimation) {
+  public sync(state: FighterState, flash: number, delta: number, animate: boolean) {
+    if (!this.ready || !this.hero.ready) {
       return
     }
 
-    this.isPunching = false
+    const actor = this.hero.actor
+    actor.position.x = state.x
+    actor.position.y = state.y
+    actor.rotation.y = state.facing === 1 ? Math.PI / 2 : -Math.PI / 2
+    const fall = state.action === 'ko' ? Math.min(1, state.actionTime / 0.45) : 0
+    actor.rotation.z = -state.facing * fall * (Math.PI / 2.4)
+    this.tint(flash, state.blocking)
 
-    this.animationsActions[this.currentAnimation].fadeOut(0.2)
-    this.animationsActions[actionName].reset()
-    this.animationsActions[actionName].fadeIn(0.2)
-    this.animationsActions[actionName].play()
-    this.currentAnimation = actionName
+    const next = clipFor(state)
+    const restart = PUNCH_CLIPS.has(next) && state.actionTime < 0.05
+    this.playClip(next, restart)
+
+    if (animate && this.animationMixer) {
+      this.animationMixer.update(delta)
+    }
   }
 
-  private canPunch() {
-    return this.velocityX === 0 && this.isPunching === false
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    switch (e.code) {
-    case this.inputs.left:
-      this.changeAnimation(this.leftSide ? 'WalkBackward' : 'WalkForward')
-      this.velocityX = -1
-      break
-    case this.inputs.right:
-      this.changeAnimation(this.leftSide ? 'WalkForward' : 'WalkBackward')
-      this.velocityX = 1
-      break
-    case this.inputs.jump:
-      if (this.velocityY === 0) {
-        this.velocityY = 1
-      }
-      break
-    case this.inputs.attackUp:
-      if (!this.canPunch()) {
+  private rememberMaterials(root: THREE.Object3D) {
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) {
         return
       }
-      this.changeAnimation('PunchUp')
-      this.isPunching = true
-      break
-    case this.inputs.attackDown:
-      if (!this.canPunch()) {
-        return
-      }
-      this.changeAnimation('PunchDown')
-      this.isPunching = true
-      break
-    default:
-      break
-    }
-  }
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    switch (e.code) {
-    case this.inputs.left:
-      if (this.velocityX === -1) {
-        this.changeAnimation('Idle')
-        this.velocityX = 0
-      }
-      break
-    case this.inputs.right:
-      if (this.velocityX === 1) {
-        this.changeAnimation('Idle')
-        this.velocityX = 0
-      }
-      break
-    default:
-      break
-    }
-  }
-
-  public hit(damage: number) {
-    this.life = applyLifeDamage(this.life, damage)
-  }
-
-  public update(delta: number) {
-    if (!this.ready || !this.hero.ready || !this._enemy) {
-      return
-    }
-
-    this.animationMixer.update(delta)
-
-    const newPosition = new THREE.Vector3(this.velocityX * 0.1, this.velocityY * delta)
-    this.hero.actor.position.add(newPosition)
-
-    if (this.velocityY > 0) {
-      this.velocityY = Math.max(this.velocityY - (9.8 * 2 * delta), 0)
-    }
-
-    if (this.isPunching) {
-      this.boxCollider.enemy.setFromObject(this.enemy.hero.actor)
-
-      for (const collider of this.hero.atttackMembersColliders) {
-        this.boxCollider.my.setFromObject(collider)
-
-        if (shouldRegisterHit(
-          true,
-          this.isHitting,
-          this.boxCollider.my.intersectsBox(this.boxCollider.enemy),
-        )) {
-          this.isHitting = true
-          this.enemy.hit(this.hero.attackDamage)
-          break
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        const standard = material as THREE.MeshStandardMaterial
+        if (!standard.emissive) {
+          continue
         }
+        this.emissive.set(material, {
+          color: standard.emissive.clone(),
+          intensity: standard.emissiveIntensity ?? 1,
+        })
+      }
+    })
+  }
+
+  private tint(flash: number, blocking: boolean) {
+    for (const [material, original] of this.emissive) {
+      const standard = material as THREE.MeshStandardMaterial
+      if (flash > 0) {
+        standard.emissive.setHex(0xff2a1a)
+        standard.emissiveIntensity = 0.85
+      } else if (blocking) {
+        standard.emissive.setHex(0x2a4cff)
+        standard.emissiveIntensity = 0.45
+      } else {
+        standard.emissive.copy(original.color)
+        standard.emissiveIntensity = original.intensity
       }
     }
+  }
+
+  private playClip(name: string, restart: boolean) {
+    const next = this.clips[name]
+    if (!next) {
+      return
+    }
+
+    if (restart && name === this.currentAnimation) {
+      next.reset()
+      next.play()
+      return
+    }
+
+    if (name === this.currentAnimation) {
+      return
+    }
+
+    const previous = this.clips[this.currentAnimation]
+    if (previous) {
+      previous.fadeOut(0.1)
+    }
+    next.reset()
+    next.fadeIn(0.1)
+    next.play()
+    this.currentAnimation = name
   }
 }

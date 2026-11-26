@@ -1,15 +1,13 @@
-export interface DebugState {
-  ready: boolean
-  status: string
-  round: number
-  timeLeft: number
-  life: { player1: number; player2: number }
-  score: { player1: number; player2: number }
-}
+import type { DebugSnapshot } from '@src/debug/snapshot'
+import type { PadSnapshot } from '@src/input/gamepad'
+import type { FighterId, Intent } from '@src/sim/types'
 
 export interface DebugApi {
   ready: boolean
-  getState: () => DebugState
+  getState: () => DebugSnapshot
+  setIntent: (id: FighterId, intent: Intent | null) => void
+  stepFor: (seconds: number) => void
+  setVirtualGamepad: (pad: PadSnapshot | null) => void
 }
 
 export function debugQueryEnabled(search: string): boolean {

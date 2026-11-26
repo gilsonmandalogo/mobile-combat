@@ -1,111 +1,69 @@
+import * as THREE from 'three'
 import Player from '@src/player'
-import type { HeroName } from '@src/hero'
+import { HeroName } from '@src/hero'
 import Animations from '@src/animations'
-import { ErrorUndefinedProperty } from '@src/errors'
 import { updateDebug } from '@src/debug'
 import { settingsStore } from '@stores/settings'
 import { contextStore } from '@stores/context'
-import { advanceAfterRound, winnerByLife } from '@src/sim/legacyRules'
-import type { DebugState } from '@src/debug/bridge'
+import { publishDebugApi } from '@src/debug/bridge'
+import { snapshotMatch } from '@src/debug/snapshot'
+import type { DebugSnapshot } from '@src/debug/snapshot'
+import { hitbox, hurtbox } from '@src/sim/hitboxes'
+import { createMatch, pauseMatch, resumeMatch, startMatch, stepMatch } from '@src/sim/match'
+import type { Aabb, FighterId, GameEvent, Intent, MatchState } from '@src/sim/types'
+import { KeyboardTracker, keyboardIntent } from '@src/input/keyboard'
+import { gamepadIntent, mergeGamepads } from '@src/input/gamepad'
+import type { HapticGamepad, PadSnapshot } from '@src/input/gamepad'
+import type { PlayerSlot } from '@src/settings/schema'
 
 interface GameConstructor {
   roundTime: number
 }
 
 export default class Game {
-  private _player1?: Player
-  public get player1() {
-    if (!this._player1) {
-      throw new ErrorUndefinedProperty('player1')
-    }
-
-    return this._player1
-  }
-
-  private _player2?: Player
-  public get player2() {
-    if (!this._player2) {
-      throw new ErrorUndefinedProperty('player2')
-    }
-
-    return this._player2
-  }
-
-  private _gameStatus: 'paused' | 'running' | 'ended' = 'running'
-  public get gameStatus() {
-    return this._gameStatus
-  }
-  public set gameStatus(value) {
-    this._gameStatus = value
-    updateDebug('Game stauts', value)
-  }
-
-  private _currentRoundTime: number
-  public get currentRoundTime() {
-    return this._currentRoundTime
-  }
-  public set currentRoundTime(value) {
-    if (value >= 0) {
-      this._currentRoundTime = value
-      updateDebug('Round time', value)
-    } else {
-      const winner = winnerByLife(this.player1.life, this.player2.life)
-      this.applyRoundResult(winner, `${winner === 'player1' ? this.player1.playerName : this.player2.playerName} wins`)
-    }
-  }
-
-  private _currentRound = 1
-  public get currentRound() {
-    return this._currentRound
-  }
-  public set currentRound(value) {
-    this._currentRound = value
-    this.player1.hero.actor.position.x = -4
-    this.player2.hero.actor.position.x = 4
-    this.player1.life = this.player1.maxLife
-    this.player2.life = this.player2.maxLife
-    this.currentRoundTime = this.roundTime
-    updateDebug('Round', value)
-  }
-
-  private domElement = contextStore.get().canvas
+  private player1?: Player
+  private player2?: Player
+  private match: MatchState
+  private keyboard: KeyboardTracker
+  private forced: Record<FighterId, Intent | null> = { player1: null, player2: null }
+  private flash: Record<FighterId, number> = { player1: 0, player2: 0 }
+  private virtualPads: PadSnapshot[] = []
+  private connectedPads: PadSnapshot[] = []
+  private padButtons: Record<PlayerSlot, boolean[]> = { player1: [], player2: [] }
+  private ready = false
   private roundTime: number
+  private hurtBoxes = [new THREE.Box3(), new THREE.Box3()]
+  private hitBoxes = [new THREE.Box3(), new THREE.Box3()]
+  private hurtHelpers: THREE.Box3Helper[]
+  private hitHelpers: THREE.Box3Helper[]
 
-  constructor({
-    roundTime,
-  }: GameConstructor) {
+  constructor({ roundTime }: GameConstructor) {
     this.roundTime = roundTime
-    this._currentRoundTime = roundTime
+    this.keyboard = new KeyboardTracker(window)
+    this.match = this.freshMatch()
 
-    this.gameStatus = 'running'
-
-    setInterval(() => {
-      if (this.gameStatus === 'running') {
-        this.currentRoundTime--
-      }
-    }, 1000)
+    const scene = contextStore.get().scene
+    this.hurtHelpers = this.hurtBoxes.map((box) => new THREE.Box3Helper(box, new THREE.Color('#5cff7a')))
+    this.hitHelpers = this.hitBoxes.map((box) => new THREE.Box3Helper(box, new THREE.Color('#ff3355')))
+    for (const helper of [...this.hurtHelpers, ...this.hitHelpers]) {
+      helper.visible = false
+      scene.add(helper)
+    }
   }
 
   public async init() {
     const animationController = new Animations()
     await animationController.loadAnimations()
 
-    this._player1 = new Player({
+    this.player1 = new Player({
       playerName: 'Player 1',
-      playerNumber: 'player1',
-      heroName: 'Mr Colin Cole' as HeroName,
+      heroName: HeroName.MrColinCole,
       animations: animationController.animations,
-      leftSide: true,
-      hitCallback: this.playerHit,
     })
-    
-    this._player2 = new Player({
+    this.player2 = new Player({
       playerName: 'Player 2',
-      playerNumber: 'player2',
-      heroName: 'Mr Colin Cole' as HeroName,
+      heroName: HeroName.MrColinCole,
       animations: animationController.animations,
-      leftSide: false,
-      hitCallback: this.playerHit,
     })
 
     await Promise.all([
@@ -113,82 +71,180 @@ export default class Game {
       this.player2.loadData(),
     ])
 
-    this.player1.enemy = this.player2
-    this.player2.enemy = this.player1
-
-    this.player1.hero.actor.rotateY(Math.PI / 2)
-    this.player2.hero.actor.rotateY(-Math.PI / 2)
-
-    this.currentRound = 1
-
-    this.domElement.addEventListener('keydown', this.onKeyDown)
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    const { menu } = settingsStore.get().inputs
-
-    if (e.code === menu) {
-      if (!['running', 'paused'].includes(this.gameStatus)) {
-        return
-      }
-
-      this.gameStatus = this.gameStatus === 'running' ? 'paused' : 'running'
-    }
-  }
-
-  public getDebugState(): DebugState {
-    return {
-      ready: Boolean(this._player1 && this._player2),
-      status: this.gameStatus,
-      round: this.currentRound,
-      timeLeft: this.currentRoundTime,
-      life: {
-        player1: this._player1?.life ?? 0,
-        player2: this._player2?.life ?? 0,
-      },
-      score: {
-        player1: this._player1?.score ?? 0,
-        player2: this._player2?.score ?? 0,
-      },
-    }
-  }
-
-  private playerHit = (player: Player) => {
-    if (player.life <= 0) {
-      const winner = player === this.player1 ? 'player2' : 'player1'
-      this.applyRoundResult(winner, `${player.enemy.playerName} wins`)
-    }
-  }
-
-  private applyRoundResult(winner: 'player1' | 'player2', reason: string) {
-    console.log(reason)
-    const result = advanceAfterRound({
-      round: this.currentRound,
-      score1: this.player1.score,
-      score2: this.player2.score,
-    }, winner)
-    this.player1.score = result.score1
-    this.player2.score = result.score2
-
-    if (result.kind === 'match') {
-      this.endGame()
-      return
-    }
-
-    this.currentRound = result.round
-  }
-
-  private endGame() {
-    this.gameStatus = 'ended'
-    console.log('Game ended')
+    this.match = startMatch(this.match).state
+    this.ready = true
+    this.syncViews(false, 0)
+    publishDebugApi(this.createDebugApi())
   }
 
   public update(delta: number) {
-    if (this.gameStatus === 'paused') {
+    this.tick(Math.min(Math.max(delta, 0), 0.05))
+  }
+
+  private tick(dt: number) {
+    if (!this.ready) {
       return
     }
 
-    this.player1.update(delta)
-    this.player2.update(delta)
+    const intents = this.pollIntents()
+    const status = this.match.status
+    if (status === 'paused' || status === 'menu' || status === 'matchEnd') {
+      this.syncViews(false, 0)
+      this.publishDebug()
+      return
+    }
+
+    const result = stepMatch(this.match, intents, dt)
+    this.match = result.state
+    for (const event of result.events) {
+      this.onEvent(event)
+    }
+    this.flash.player1 = Math.max(0, this.flash.player1 - dt)
+    this.flash.player2 = Math.max(0, this.flash.player2 - dt)
+    this.syncViews(true, dt)
+    this.publishDebug()
   }
+
+  private freshMatch(): MatchState {
+    const settings = settingsStore.get()
+    const deviceFor = (slot: PlayerSlot): MatchState['fighters'][number]['device'] => {
+      return settings.players[slot].device === 'gamepad' ? 'gamepad' : 'keyboard'
+    }
+    return createMatch({
+      mode: 'local',
+      difficulty: 'normal',
+      roundTime: this.roundTime,
+      names: [settings.players.player1.name, settings.players.player2.name],
+      devices: [deviceFor('player1'), deviceFor('player2')],
+      seed: 1,
+    })
+  }
+
+  private pollIntents(): Record<FighterId, Intent> {
+    const settings = settingsStore.get()
+    const edges = this.keyboard.consumeEdges()
+    if (edges.has(settings.menuKey)) {
+      this.togglePause()
+    }
+
+    const native = typeof navigator !== 'undefined' && navigator.getGamepads
+      ? navigator.getGamepads()
+      : []
+    const pads = mergeGamepads(native as Array<HapticGamepad | null> | null, this.virtualPads)
+    this.connectedPads = pads
+    const fromDevice = {
+      player1: this.intentFor('player1', settings, edges, pads),
+      player2: this.intentFor('player2', settings, edges, pads),
+    }
+
+    return {
+      player1: this.forced.player1 ?? fromDevice.player1,
+      player2: this.forced.player2 ?? fromDevice.player2,
+    }
+  }
+
+  private intentFor(
+    slot: PlayerSlot,
+    settings: ReturnType<typeof settingsStore.get>,
+    edges: ReadonlySet<string>,
+    pads: PadSnapshot[],
+  ): Intent {
+    const player = settings.players[slot]
+    if (player.device === 'gamepad') {
+      const pad = pads.find((item) => item.index === player.gamepadIndex) ?? null
+      const result = gamepadIntent(pad, player.pad, this.padButtons[slot])
+      this.padButtons[slot] = result.pressed
+      return result.intent
+    }
+    return keyboardIntent(this.keyboard.held, player.keys, edges)
+  }
+
+  private togglePause() {
+    if (this.match.status === 'running' || this.match.status === 'roundEnd') {
+      this.match = pauseMatch(this.match)
+      return
+    }
+    if (this.match.status === 'paused') {
+      this.match = resumeMatch(this.match)
+    }
+  }
+
+  private onEvent(event: GameEvent) {
+    if (event.type !== 'hit') {
+      return
+    }
+    this.flash[event.defender] = 0.16
+    const strength = event.blocked ? 0.35 : 0.9
+    this.rumble(event.defender, strength, event.blocked ? 0.2 : 0.45, event.blocked ? 70 : 150)
+    this.rumble(event.attacker, 0.25, 0.12, 60)
+  }
+
+  private rumble(id: FighterId, strong: number, weak: number, duration: number) {
+    const player = settingsStore.get().players[id]
+    if (player.device !== 'gamepad') {
+      return
+    }
+    const pad = this.connectedPads.find((item) => item.index === player.gamepadIndex)
+    pad?.vibrate?.(strong, weak, duration)
+  }
+
+  private syncViews(animate: boolean, delta: number) {
+    const players = [this.player1, this.player2]
+    const showDebug = settingsStore.get().debug
+    this.match.fighters.forEach((fighter, index) => {
+      players[index]?.sync(fighter, this.flash[fighter.id], delta, animate)
+      applyAabb(this.hurtBoxes[index], hurtbox(fighter))
+      applyAabb(this.hitBoxes[index], hitbox(fighter))
+      this.hurtHelpers[index].visible = showDebug
+      this.hitHelpers[index].visible = showDebug && hitbox(fighter) !== null
+    })
+  }
+
+  private publishDebug() {
+    const [first, second] = this.match.fighters
+    updateDebug('Game status', this.match.status)
+    updateDebug('Round', this.match.round)
+    updateDebug('Round time', Math.ceil(this.match.timeLeft))
+    updateDebug('Banner', this.match.banner ?? '')
+    updateDebug(`${first.name} life`, first.life)
+    updateDebug(`${second.name} life`, second.life)
+    updateDebug(`${first.name} score`, first.score)
+    updateDebug(`${second.name} score`, second.score)
+  }
+
+  private createDebugApi() {
+    return {
+      ready: true,
+      getState: (): DebugSnapshot => snapshotMatch(this.match, this.ready),
+      setIntent: (id: FighterId, intent: Intent | null) => {
+        this.forced[id] = intent
+      },
+      stepFor: (seconds: number) => {
+        const frame = 1 / 60
+        let left = Math.max(0, seconds)
+        while (left > 1e-6) {
+          const step = Math.min(frame, left)
+          this.tick(step)
+          left -= step
+        }
+      },
+      setVirtualGamepad: (pad: PadSnapshot | null) => {
+        if (!pad) {
+          this.virtualPads = []
+          return
+        }
+        this.virtualPads = this.virtualPads.filter((item) => item.index !== pad.index).concat(pad)
+      },
+    }
+  }
+}
+
+function applyAabb(box: THREE.Box3, aabb: Aabb | null) {
+  if (!aabb) {
+    box.min.set(0, 0, 0)
+    box.max.set(0, 0, 0)
+    return
+  }
+  box.min.set(aabb.minX, aabb.minY, -0.3)
+  box.max.set(aabb.maxX, aabb.maxY, 0.3)
 }

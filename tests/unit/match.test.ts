@@ -1,0 +1,166 @@
+import { describe, expect, it } from 'vitest'
+import { ATTACKS, ROUND_END_DELAY } from '@src/sim/constants'
+import { createMatch, pauseMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
+import { EMPTY_INTENT } from '@src/sim/types'
+import type { FighterId, Intent, MatchState } from '@src/sim/types'
+
+const both = (override: Partial<Intent> = {}): Record<FighterId, Intent> => ({
+  player1: { ...EMPTY_INTENT, ...override },
+  player2: { ...EMPTY_INTENT },
+})
+
+function fight(): MatchState {
+  const started = startMatch(createMatch({
+    mode: 'local',
+    difficulty: 'normal',
+    roundTime: 20,
+    names: ['Red', 'Blue'],
+    devices: ['keyboard', 'keyboard'],
+    seed: 1,
+  }))
+  return { ...started.state, introTime: 0, banner: null }
+}
+
+function place(state: MatchState, x1: number, x2: number): MatchState {
+  const fighters = [
+    { ...state.fighters[0], x: x1 },
+    { ...state.fighters[1], x: x2 },
+  ] as MatchState['fighters']
+  return { ...state, fighters }
+}
+
+describe('match simulation', () => {
+  it('walks, stops at the wall, and jumps back to the ground', () => {
+    const walked = stepSeconds(fight(), both({ move: 1 }), 0.5)
+    expect(walked.state.fighters[0].x).toBeGreaterThan(fight().fighters[0].x)
+    expect(walked.state.fighters[0].action).toBe('walk')
+
+    const walled = stepSeconds(place(fight(), 5.9, 3), both({ move: 1 }), 0.5)
+    expect(walled.state.fighters[0].x).toBeLessThanOrEqual(6)
+
+    let jumping = stepMatch(fight(), both({ jump: true }), 1 / 60)
+    expect(jumping.state.fighters[0].vy).toBeGreaterThan(0)
+    jumping = stepSeconds(jumping.state, both(), 0.2)
+    expect(jumping.state.fighters[0].y).toBeGreaterThan(0.4)
+    const landed = stepSeconds(jumping.state, both(), 2)
+    expect(landed.state.fighters[0].y).toBe(0)
+  })
+
+  it('deals damage and knocks the defender away once per punch', () => {
+    let state = place(fight(), 0, 0.95)
+    const before = state.fighters[1].x
+    const active = stepSeconds(state, both({ attackUp: true }), ATTACKS.attackUp.startup + ATTACKS.attackUp.active)
+    const hit = active.events.find((event) => event.type === 'hit')
+    expect(hit).toMatchObject({ type: 'hit', attacker: 'player1', defender: 'player2', blocked: false })
+    state = active.state
+    expect(state.fighters[1].life).toBe(100 - ATTACKS.attackUp.damage)
+    expect(state.fighters[1].x).toBeGreaterThan(before)
+    expect(state.fighters[1].action).toBe('hitstun')
+
+    const again = stepMatch(state, both({ attackUp: true }), 1 / 60)
+    expect(again.state.fighters[1].life).toBe(state.fighters[1].life)
+  })
+
+  it('reduces damage when the defender is blocking from the front', () => {
+    const open = stepSeconds(
+      place(fight(), 0, 0.95),
+      both({ attackDown: true }),
+      ATTACKS.attackDown.startup + ATTACKS.attackDown.active,
+    )
+    const guarded = stepSeconds(
+      place(fight(), 0, 0.95),
+      {
+        player1: { ...EMPTY_INTENT, attackDown: true },
+        player2: { ...EMPTY_INTENT, block: true },
+      },
+      ATTACKS.attackDown.startup + ATTACKS.attackDown.active,
+    )
+    const blocked = guarded.events.find((event) => event.type === 'hit')
+    expect(blocked).toMatchObject({ blocked: true })
+    expect(guarded.state.fighters[1].life).toBeGreaterThan(open.state.fighters[1].life)
+    expect(guarded.state.fighters[1].life).toBeLessThan(100)
+  })
+
+  it('lets a jump evade a low punch', () => {
+    let state = place(fight(), 0, 0.95)
+    state = {
+      ...state,
+      fighters: [
+        {
+          ...state.fighters[0],
+          action: 'attackDown',
+          actionTime: ATTACKS.attackDown.startup,
+          attackResolved: false,
+        },
+        { ...state.fighters[1], y: 2.5, vy: 2 },
+      ],
+    }
+    const result = stepMatch(state, both(), 1 / 120)
+    expect(result.events.some((event) => event.type === 'hit')).toBe(false)
+    expect(result.state.fighters[1].life).toBe(100)
+  })
+
+  it('awards a round on KO and the match on the second knockout', () => {
+    let state = place(fight(), 0, 0.95)
+    state = {
+      ...state,
+      fighters: [
+        state.fighters[0],
+        { ...state.fighters[1], life: ATTACKS.attackDown.damage },
+      ],
+    }
+    const ko = stepSeconds(state, both({ attackDown: true }), 0.4)
+    expect(ko.events.some((event) => event.type === 'ko' && event.fighter === 'player2')).toBe(true)
+    expect(ko.state.status).toBe('roundEnd')
+    expect(ko.state.banner).toBe('K.O.')
+    expect(ko.state.fighters[0].score).toBe(1)
+    expect(ko.state.fighters[1].ko).toBe(true)
+
+    const next = stepSeconds(ko.state, both(), ROUND_END_DELAY + 0.05)
+    expect(next.state.status).toBe('running')
+    expect(next.state.round).toBe(2)
+    expect(next.state.fighters[1].life).toBe(100)
+
+    let deciding: MatchState = { ...next.state, introTime: 0, banner: null }
+    deciding = place(deciding, 0, 0.95)
+    deciding = {
+      ...deciding,
+      fighters: [
+        deciding.fighters[0],
+        { ...deciding.fighters[1], life: ATTACKS.attackDown.damage },
+      ],
+    }
+    const second = stepSeconds(deciding, both({ attackDown: true }), 0.4)
+    expect(second.state.matchPending).toBe(true)
+    expect(second.state.fighters[0].score).toBe(2)
+    const ended = stepSeconds(second.state, both(), ROUND_END_DELAY + 0.05)
+    expect(ended.state.status).toBe('matchEnd')
+    expect(ended.state.winner).toBe('player1')
+    expect(ended.state.banner).toBe('Red wins')
+  })
+
+  it('gives a timed-out round to the fighter with more life', () => {
+    let state = fight()
+    state = {
+      ...state,
+      timeLeft: 0.05,
+      fighters: [
+        { ...state.fighters[0], life: 40 },
+        { ...state.fighters[1], life: 70 },
+      ],
+    }
+    const result = stepSeconds(state, both(), 0.2)
+    expect(result.state.roundWinner).toBe('player2')
+    expect(result.state.fighters[1].score).toBe(1)
+    expect(result.state.banner).toBe('Blue takes the round')
+  })
+
+  it('does not advance the clock while paused', () => {
+    const paused = pauseMatch(fight())
+    const stepped = stepSeconds(paused, both({ move: 1 }), 1)
+    expect(stepped.state.timeLeft).toBe(paused.timeLeft)
+    expect(stepped.state.fighters[0].x).toBe(paused.fighters[0].x)
+    const resumed = stepSeconds(resumeMatch(stepped.state), both({ move: 1 }), 0.3)
+    expect(resumed.state.fighters[0].x).toBeGreaterThan(paused.fighters[0].x)
+  })
+})

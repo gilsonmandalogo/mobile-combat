@@ -3,7 +3,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import Game from '@src/game'
 import { contextStore } from '@stores/context'
 import { getLevelClassByName } from '@src/utils'
-import { publishDebugApi } from '@src/debug/bridge'
 
 const scene = new THREE.Scene()
 contextStore.setKey('scene', scene)
@@ -27,15 +26,12 @@ camera.aspect = window.innerWidth / window.innerHeight
 camera.updateProjectionMatrix()
 
 const gameController = new Game({
-  roundTime: 90,
+  roundTime: 60,
 })
 await gameController.init()
-publishDebugApi({
-  ready: true,
-  getState: () => gameController.getDebugState(),
-})
 
 const controls = new OrbitControls(camera, renderer.domElement)
+controls.enabled = false
 
 window.addEventListener('resize', onWindowResize, false)
 
