@@ -1,6 +1,7 @@
 import { settingsStore } from '@stores/settings'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 import { deviceValue, readMatchSetup } from '@src/ui/setup'
+import { hudView } from '@src/ui/hud'
 import type { Difficulty, MatchMode } from '@src/sim/types'
 
 export interface MatchHost {
@@ -71,6 +72,51 @@ export class Shell {
     const pause = document.getElementById('pause-menu')
     if (pause) {
       pause.hidden = state.status !== 'paused' || settingsOpen
+    }
+    this.renderHud(state)
+  }
+
+  private renderHud(state: DebugSnapshot) {
+    const hud = document.getElementById('hud')
+    const banner = document.getElementById('banner')
+    if (!hud || !banner) {
+      return
+    }
+    const settings = settingsStore.get()
+    const view = hudView(state, [
+      settings.players.player1.gamepadIndex,
+      settings.players.player2.gamepadIndex,
+    ])
+    hud.hidden = !view.visible
+    this.text('timer', view.timer)
+    this.text('round-label', view.roundLabel)
+    banner.hidden = view.banner === null
+    banner.textContent = view.banner ?? ''
+    view.fighters.forEach((fighter, index) => {
+      const slot = index === 0 ? 'player1' : 'player2'
+      this.text(`hud-name-${slot}`, fighter.name)
+      this.text(`hud-device-${slot}`, fighter.device)
+      this.text(`life-${slot}`, String(fighter.life))
+      const bar = document.querySelector(`[data-testid="health-${slot}"]`)
+      if (bar instanceof HTMLElement) {
+        bar.style.transform = `scaleX(${fighter.health})`
+      }
+      const pips = document.querySelector(`[data-testid="rounds-${slot}"]`)
+      if (pips) {
+        pips.replaceChildren()
+        for (const won of fighter.rounds) {
+          const pip = document.createElement('span')
+          pip.className = won ? 'pip won' : 'pip'
+          pips.append(pip)
+        }
+      }
+    })
+  }
+
+  private text(id: string, value: string) {
+    const element = document.querySelector(`[data-testid="${id}"]`)
+    if (element) {
+      element.textContent = value
     }
   }
 

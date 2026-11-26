@@ -72,6 +72,35 @@ import '@src/styles.css'
           <button id="close-settings" data-testid="close-settings" type="button">Back</button>
         </div>
       </section>
+      <div id="hud" data-testid="hud" hidden>
+        <div class="hud-side">
+          <div class="hud-meta">
+            <span data-testid="hud-name-player1"></span>
+            <span data-testid="hud-device-player1" class="device-tag"></span>
+          </div>
+          <div class="health"><div data-testid="health-player1"></div></div>
+          <div class="hud-meta">
+            <span data-testid="life-player1" class="life-num"></span>
+            <span data-testid="rounds-player1" class="pips"></span>
+          </div>
+        </div>
+        <div>
+          <div data-testid="timer" class="timer">60</div>
+          <div data-testid="round-label" class="round-label">Round 1</div>
+        </div>
+        <div class="hud-side right">
+          <div class="hud-meta">
+            <span data-testid="hud-device-player2" class="device-tag"></span>
+            <span data-testid="hud-name-player2"></span>
+          </div>
+          <div class="health"><div data-testid="health-player2"></div></div>
+          <div class="hud-meta">
+            <span data-testid="rounds-player2" class="pips"></span>
+            <span data-testid="life-player2" class="life-num"></span>
+          </div>
+        </div>
+      </div>
+      <div id="banner" data-testid="banner" hidden></div>
     </div>
     <pre id="debug"></pre>
   </body>
