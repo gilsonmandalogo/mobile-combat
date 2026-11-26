@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('keyboard movement reaches the simulation', async ({ page }) => {
-  await page.goto('/mobile-combat/?debug=1')
+  await page.goto('/mobile-combat/?debug=1&autostart=1')
   await page.waitForFunction(() => {
     const api = (window as unknown as { __MOBILE_COMBAT__?: { ready: boolean } }).__MOBILE_COMBAT__
     return api?.ready === true
@@ -40,7 +40,7 @@ test('keyboard movement reaches the simulation', async ({ page }) => {
 })
 
 test('punches damage, knock back, and decide the match', async ({ page }) => {
-  await page.goto('/mobile-combat/?debug=1')
+  await page.goto('/mobile-combat/?debug=1&autostart=1')
   await page.waitForFunction(() => {
     const api = (window as unknown as { __MOBILE_COMBAT__?: { ready: boolean } }).__MOBILE_COMBAT__
     return api?.ready === true

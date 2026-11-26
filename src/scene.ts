@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import Game from '@src/game'
+import { Shell } from '@src/ui/shell'
 import { contextStore } from '@stores/context'
 import { getLevelClassByName } from '@src/utils'
 
@@ -28,6 +29,8 @@ camera.updateProjectionMatrix()
 const gameController = new Game({
   roundTime: 60,
 })
+const shell = new Shell(gameController)
+gameController.attachShell(shell)
 await gameController.init()
 
 const controls = new OrbitControls(camera, renderer.domElement)

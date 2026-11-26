@@ -10,8 +10,9 @@ import { snapshotMatch } from '@src/debug/snapshot'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 import { hitbox, hurtbox } from '@src/sim/hitboxes'
 import { createMatch, pauseMatch, resumeMatch, startMatch, stepMatch } from '@src/sim/match'
-import type { Aabb, FighterId, GameEvent, Intent, MatchState } from '@src/sim/types'
+import type { Aabb, Difficulty, FighterId, GameEvent, Intent, MatchMode, MatchState } from '@src/sim/types'
 import { KeyboardTracker, keyboardIntent } from '@src/input/keyboard'
+import type { Shell } from '@src/ui/shell'
 import { gamepadIntent, mergeGamepads } from '@src/input/gamepad'
 import type { HapticGamepad, PadSnapshot } from '@src/input/gamepad'
 import type { PlayerSlot } from '@src/settings/schema'
@@ -31,6 +32,7 @@ export default class Game {
   private connectedPads: PadSnapshot[] = []
   private padButtons: Record<PlayerSlot, boolean[]> = { player1: [], player2: [] }
   private ready = false
+  private shell?: Shell
   private roundTime: number
   private hurtBoxes = [new THREE.Box3(), new THREE.Box3()]
   private hitBoxes = [new THREE.Box3(), new THREE.Box3()]
@@ -71,10 +73,48 @@ export default class Game {
       this.player2.loadData(),
     ])
 
-    this.match = startMatch(this.match).state
     this.ready = true
-    this.syncViews(false, 0)
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('autostart') === '1') {
+      const requested = params.get('difficulty')
+      const difficulty: Difficulty = requested === 'easy' || requested === 'hard' ? requested : 'normal'
+      const seed = Number(params.get('seed'))
+      this.beginMatch({
+        mode: params.get('mode') === 'ai' ? 'ai' : 'local',
+        difficulty,
+        seed: Number.isFinite(seed) && seed > 0 ? Math.floor(seed) : 1,
+      })
+    } else {
+      this.present(false, 0)
+    }
+    this.shell?.setReady(true)
     publishDebugApi(this.createDebugApi())
+  }
+
+  public attachShell(shell: Shell) {
+    this.shell = shell
+    shell.mount()
+  }
+
+  public beginMatch(options: { mode: MatchMode; difficulty: Difficulty; seed?: number }) {
+    const settings = settingsStore.get()
+    const secondDevice = options.mode === 'ai'
+      ? 'ai'
+      : settings.players.player2.device === 'gamepad' ? 'gamepad' : 'keyboard'
+    this.forced = { player1: null, player2: null }
+    this.flash = { player1: 0, player2: 0 }
+    this.match = startMatch(createMatch({
+      mode: options.mode,
+      difficulty: options.difficulty,
+      roundTime: this.roundTime,
+      names: [settings.players.player1.name, settings.players.player2.name],
+      devices: [
+        settings.players.player1.device === 'gamepad' ? 'gamepad' : 'keyboard',
+        secondDevice,
+      ],
+      seed: options.seed ?? 1,
+    })).state
+    this.present(false, 0)
   }
 
   public update(delta: number) {
@@ -89,8 +129,7 @@ export default class Game {
     const intents = this.pollIntents()
     const status = this.match.status
     if (status === 'paused' || status === 'menu' || status === 'matchEnd') {
-      this.syncViews(false, 0)
-      this.publishDebug()
+      this.present(false, 0)
       return
     }
 
@@ -101,8 +140,7 @@ export default class Game {
     }
     this.flash.player1 = Math.max(0, this.flash.player1 - dt)
     this.flash.player2 = Math.max(0, this.flash.player2 - dt)
-    this.syncViews(true, dt)
-    this.publishDebug()
+    this.present(true, dt)
   }
 
   private freshMatch(): MatchState {
@@ -198,6 +236,12 @@ export default class Game {
       this.hurtHelpers[index].visible = showDebug
       this.hitHelpers[index].visible = showDebug && hitbox(fighter) !== null
     })
+  }
+
+  private present(animate: boolean, delta: number) {
+    this.syncViews(animate, delta)
+    this.publishDebug()
+    this.shell?.render(snapshotMatch(this.match, this.ready))
   }
 
   private publishDebug() {

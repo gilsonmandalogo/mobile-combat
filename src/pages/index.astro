@@ -10,9 +10,53 @@ import '@src/styles.css'
     <title>Mobile Combat</title>
   </head>
   <body>
-    <div>
-      <pre id="debug" />
+    <div id="overlay">
+      <section id="main-menu" class="panel menu-panel" data-testid="main-menu">
+        <p class="eyebrow">Temple arena</p>
+        <h1>Mobile Combat</h1>
+        <p class="tagline">Two fighters. One stone floor. First to two rounds.</p>
+        <label>
+          Mode
+          <select id="mode" data-testid="mode-select">
+            <option value="local">Versus human</option>
+            <option value="ai">Versus AI</option>
+          </select>
+        </label>
+        <label id="difficulty-row">
+          Difficulty
+          <select id="difficulty" data-testid="difficulty-select">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <div class="player-grid">
+          <fieldset>
+            <legend>Player 1</legend>
+            <input id="name1" data-testid="name-player1-input" maxlength="18" value="Player 1" />
+            <select id="device1" data-testid="device-player1">
+              <option value="keyboard">Keyboard</option>
+              <option value="pad-0">Gamepad 1</option>
+              <option value="pad-1">Gamepad 2</option>
+            </select>
+          </fieldset>
+          <fieldset>
+            <legend>Player 2</legend>
+            <input id="name2" data-testid="name-player2-input" maxlength="18" value="Player 2" />
+            <select id="device2" data-testid="device-player2">
+              <option value="keyboard">Keyboard</option>
+              <option value="pad-0">Gamepad 1</option>
+              <option value="pad-1">Gamepad 2</option>
+            </select>
+          </fieldset>
+        </div>
+        <p id="pad-note" class="note" data-testid="pad-note"></p>
+        <div class="menu-actions">
+          <button id="start-match" data-testid="start-match" type="button" disabled>Loading arena…</button>
+        </div>
+      </section>
     </div>
+    <pre id="debug"></pre>
   </body>
 </html>
 

@@ -27,7 +27,7 @@ test('a virtual gamepad moves a player and rumbles when they are hit', async ({ 
     localStorage.setItem('settings', JSON.stringify(settings))
   })
 
-  await page.goto('/mobile-combat/?debug=1')
+  await page.goto('/mobile-combat/?debug=1&autostart=1')
   await page.waitForFunction(() => {
     const api = (window as unknown as { __MOBILE_COMBAT__?: { ready: boolean } }).__MOBILE_COMBAT__
     return api?.ready === true

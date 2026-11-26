@@ -1,0 +1,108 @@
+import { settingsStore } from '@stores/settings'
+import type { DebugSnapshot } from '@src/debug/snapshot'
+import { deviceValue, readMatchSetup } from '@src/ui/setup'
+import type { Difficulty, MatchMode } from '@src/sim/types'
+
+export interface MatchHost {
+  beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number }) => void
+}
+
+export class Shell {
+  private ready = false
+
+  constructor(private host: MatchHost) {}
+
+  mount() {
+    const mode = this.required<HTMLSelectElement>('mode')
+    const difficultyRow = this.required<HTMLElement>('difficulty-row')
+    const syncMode = () => {
+      const versusAi = mode.value === 'ai'
+      difficultyRow.hidden = !versusAi
+      this.required<HTMLSelectElement>('device2').disabled = versusAi
+    }
+    mode.addEventListener('change', syncMode)
+    syncMode()
+
+    this.required<HTMLButtonElement>('start-match').addEventListener('click', () => {
+      if (!this.ready) {
+        return
+      }
+      const setup = readMatchSetup({
+        mode: mode.value,
+        difficulty: this.required<HTMLSelectElement>('difficulty').value,
+        name1: this.required<HTMLInputElement>('name1').value,
+        name2: this.required<HTMLInputElement>('name2').value,
+        device1: this.required<HTMLSelectElement>('device1').value,
+        device2: this.required<HTMLSelectElement>('device2').value,
+      })
+      this.persistSetup(setup)
+      this.host.beginMatch({ mode: setup.mode, difficulty: setup.difficulty })
+    })
+
+    window.addEventListener('gamepadconnected', () => this.refreshPads())
+    window.addEventListener('gamepaddisconnected', () => this.refreshPads())
+    this.refreshPads()
+    this.fillFromSettings()
+  }
+
+  setReady(ready: boolean) {
+    this.ready = ready
+    const button = document.getElementById('start-match')
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = !ready
+      button.textContent = ready ? 'Start match' : 'Loading arena…'
+    }
+  }
+
+  render(state: DebugSnapshot) {
+    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu'
+  }
+
+  private persistSetup(setup: ReturnType<typeof readMatchSetup>) {
+    const current = settingsStore.get()
+    const secondDevice = setup.mode === 'ai'
+      ? { device: current.players.player2.device, gamepadIndex: current.players.player2.gamepadIndex }
+      : setup.device2
+    settingsStore.set({
+      ...current,
+      players: {
+        player1: { ...current.players.player1, name: setup.name1, ...setup.device1 },
+        player2: { ...current.players.player2, name: setup.name2, ...secondDevice },
+      },
+    })
+  }
+
+  private fillFromSettings() {
+    const settings = settingsStore.get()
+    this.setValue('name1', settings.players.player1.name)
+    this.setValue('name2', settings.players.player2.name)
+    this.setValue('device1', deviceValue(settings.players.player1))
+    this.setValue('device2', deviceValue(settings.players.player2))
+  }
+
+  private refreshPads() {
+    const note = document.getElementById('pad-note')
+    if (!note || typeof navigator === 'undefined' || !navigator.getGamepads) {
+      return
+    }
+    const count = navigator.getGamepads().filter((pad) => pad && pad.connected).length
+    note.textContent = count === 0
+      ? 'No gamepad detected. Press a button on a pad, or play on the keyboard.'
+      : `${count} gamepad${count === 1 ? '' : 's'} connected.`
+  }
+
+  private setValue(id: string, value: string) {
+    const element = document.getElementById(id)
+    if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) {
+      element.value = value
+    }
+  }
+
+  private required<T extends HTMLElement>(id: string): T {
+    const element = document.getElementById(id)
+    if (!element) {
+      throw new Error(`Missing #${id}`)
+    }
+    return element as T
+  }
+}
