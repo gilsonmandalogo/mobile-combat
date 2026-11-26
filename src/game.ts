@@ -15,6 +15,9 @@ import { KeyboardTracker, keyboardIntent } from '@src/input/keyboard'
 import type { Shell } from '@src/ui/shell'
 import { gamepadIntent, mergeGamepads } from '@src/input/gamepad'
 import type { HapticGamepad, PadSnapshot } from '@src/input/gamepad'
+import { createAiMemory, stepAi } from '@src/ai/opponent'
+import type { AiMemory } from '@src/ai/opponent'
+import { EMPTY_INTENT } from '@src/sim/types'
 import type { PlayerSlot } from '@src/settings/schema'
 
 interface GameConstructor {
@@ -32,6 +35,7 @@ export default class Game {
   private connectedPads: PadSnapshot[] = []
   private padButtons: Record<PlayerSlot, boolean[]> = { player1: [], player2: [] }
   private ready = false
+  private ai: AiMemory | null = null
   private shell?: Shell
   private roundTime: number
   private hurtBoxes = [new THREE.Box3(), new THREE.Box3()]
@@ -103,6 +107,7 @@ export default class Game {
       : settings.players.player2.device === 'gamepad' ? 'gamepad' : 'keyboard'
     this.forced = { player1: null, player2: null }
     this.flash = { player1: 0, player2: 0 }
+    this.ai = options.mode === 'ai' ? createAiMemory(options.seed ?? 1) : null
     this.match = startMatch(createMatch({
       mode: options.mode,
       difficulty: options.difficulty,
@@ -124,6 +129,7 @@ export default class Game {
 
   public restart() {
     this.forced = { player1: null, player2: null }
+    this.ai = this.match.mode === 'ai' ? createAiMemory(this.match.seed) : null
     this.match = restartMatch(this.match)
     this.present(false, 0)
   }
@@ -131,6 +137,7 @@ export default class Game {
   public quitToMenu() {
     this.shell?.showSettings(false)
     this.forced = { player1: null, player2: null }
+    this.ai = null
     this.match = menuState(this.match)
     this.present(false, 0)
   }
@@ -144,9 +151,10 @@ export default class Game {
       return
     }
 
-    const intents = this.pollIntents()
     const status = this.match.status
-    if (status === 'paused' || status === 'menu' || status === 'matchEnd') {
+    const simulate = status !== 'paused' && status !== 'menu' && status !== 'matchEnd'
+    const intents = this.pollIntents(dt, simulate)
+    if (!simulate) {
       this.present(false, 0)
       return
     }
@@ -176,7 +184,7 @@ export default class Game {
     })
   }
 
-  private pollIntents(): Record<FighterId, Intent> {
+  private pollIntents(dt: number, simulate: boolean): Record<FighterId, Intent> {
     const settings = settingsStore.get()
     const edges = this.keyboard.consumeEdges()
     if (edges.has(settings.menuKey)) {
@@ -193,8 +201,8 @@ export default class Game {
     const pads = mergeGamepads(native as Array<HapticGamepad | null> | null, this.virtualPads)
     this.connectedPads = pads
     const fromDevice = {
-      player1: this.intentFor('player1', settings, edges, pads),
-      player2: this.intentFor('player2', settings, edges, pads),
+      player1: this.intentFor('player1', settings, edges, pads, dt, simulate),
+      player2: this.intentFor('player2', settings, edges, pads, dt, simulate),
     }
 
     return {
@@ -208,7 +216,19 @@ export default class Game {
     settings: ReturnType<typeof settingsStore.get>,
     edges: ReadonlySet<string>,
     pads: PadSnapshot[],
+    dt: number,
+    simulate: boolean,
   ): Intent {
+    const fighter = this.match.fighters.find((item) => item.id === slot)
+    if (fighter?.device === 'ai') {
+      if (!simulate || !this.ai) {
+        return { ...EMPTY_INTENT }
+      }
+      const enemy = this.match.fighters.find((item) => item.id !== slot) ?? fighter
+      const result = stepAi(this.ai, fighter, enemy, this.match.difficulty, dt)
+      this.ai = result.memory
+      return result.intent
+    }
     const player = settings.players[slot]
     if (player.device === 'gamepad') {
       const pad = pads.find((item) => item.index === player.gamepadIndex) ?? null
@@ -263,7 +283,7 @@ export default class Game {
   private present(animate: boolean, delta: number) {
     this.syncViews(animate, delta)
     this.publishDebug()
-    this.shell?.render(snapshotMatch(this.match, this.ready))
+    this.shell?.render(snapshotMatch(this.match, this.ready, this.ai?.state ?? null))
   }
 
   private publishDebug() {
@@ -281,7 +301,7 @@ export default class Game {
   private createDebugApi() {
     return {
       ready: true,
-      getState: (): DebugSnapshot => snapshotMatch(this.match, this.ready),
+      getState: (): DebugSnapshot => snapshotMatch(this.match, this.ready, this.ai?.state ?? null),
       setIntent: (id: FighterId, intent: Intent | null) => {
         this.forced[id] = intent
       },

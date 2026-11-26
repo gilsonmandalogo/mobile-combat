@@ -30,9 +30,10 @@ export interface DebugSnapshot {
   life: { player1: number; player2: number }
   score: { player1: number; player2: number }
   fighters: [DebugFighter, DebugFighter]
+  aiState: string | null
 }
 
-export function snapshotMatch(state: MatchState, ready: boolean): DebugSnapshot {
+export function snapshotMatch(state: MatchState, ready: boolean, aiState: string | null = null): DebugSnapshot {
   const fighters = state.fighters.map((fighter): DebugFighter => ({
     id: fighter.id,
     name: fighter.name,
@@ -63,5 +64,6 @@ export function snapshotMatch(state: MatchState, ready: boolean): DebugSnapshot 
     life: { player1: fighters[0].life, player2: fighters[1].life },
     score: { player1: fighters[0].score, player2: fighters[1].score },
     fighters,
+    aiState,
   }
 }
