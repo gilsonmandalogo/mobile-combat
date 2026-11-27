@@ -40,9 +40,9 @@ export const moveSchema = z.object({
   input: z.string().min(1),
   damage: z.number().positive(),
   chip: chipSchema.optional(),
-  slot: z.enum(['attackUp', 'attackDown', 'crouchPunch', 'crouchKick']).optional(),
+  slot: z.enum(['attackUp', 'attackDown', 'crouchPunch', 'crouchKick', 'jumpPunch', 'jumpKick']).optional(),
   hitLevel: hitLevelSchema.optional(),
-  height: z.enum(['stand', 'crouch']).optional(),
+  height: z.enum(['stand', 'crouch', 'air']).optional(),
   ...strikeTiming,
 })
 
@@ -87,6 +87,10 @@ export const characterSchema = z.object({
   model: z.discriminatedUnion('kind', [glbModelSchema, primitiveModelSchema]),
   moves: z.array(moveSchema).min(1),
   combos: z.array(comboSchema).default([]),
+  air: z.object({
+    hurtHeight: z.number().positive().max(3),
+    hurtHalfW: z.number().positive().max(1.5),
+  }).optional(),
 })
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb color')

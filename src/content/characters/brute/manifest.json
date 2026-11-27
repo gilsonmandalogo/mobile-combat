@@ -10,6 +10,7 @@
     "punchUp": "PunchUp",
     "punchDown": "PunchDown"
   },
+  "air": { "hurtHeight": 1.35, "hurtHalfW": 0.4 },
   "model": {
     "kind": "primitive",
     "color": "#8d2f2f",
@@ -20,7 +21,9 @@
     { "name": "Hammer", "input": "Punch up", "damage": 12, "chip": 0.2, "slot": "attackUp", "hitLevel": "high", "height": "stand" },
     { "name": "Stomp", "input": "Punch down", "damage": 19, "chip": 0.3, "slot": "attackDown", "hitLevel": "low", "height": "stand" },
     { "name": "Crouch hammer", "input": "Crouch + Punch", "damage": 10, "chip": 0.15, "slot": "crouchPunch", "hitLevel": "mid", "height": "crouch", "startup": 0.1, "active": 0.14, "recovery": 0.26, "reach": 0.9, "hitY": 0.58, "hitW": 0.8, "hitH": 0.42, "knockback": 4.2, "hop": 1.6 },
-    { "name": "Ground smash", "input": "Crouch + Kick", "damage": 16, "chip": 0.25, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.18, "active": 0.16, "recovery": 0.38, "reach": 1.15, "hitY": 0.3, "hitW": 1.12, "hitH": 0.34, "knockback": 6.4, "hop": 2.8 }
+    { "name": "Ground smash", "input": "Crouch + Kick", "damage": 16, "chip": 0.25, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.18, "active": 0.16, "recovery": 0.38, "reach": 1.15, "hitY": 0.3, "hitW": 1.12, "hitH": 0.34, "knockback": 6.4, "hop": 2.8 },
+    { "name": "Jump hammer", "input": "Jump + Punch", "damage": 13, "chip": 0.2, "slot": "jumpPunch", "hitLevel": "overhead", "height": "air", "startup": 0.08, "active": 0.12, "recovery": 0.2, "reach": 0.9, "hitY": 0.48, "hitW": 0.82, "hitH": 0.58, "knockback": 4.6, "hop": 3.6 },
+    { "name": "Jump stomp", "input": "Jump + Kick", "damage": 16, "chip": 0.25, "slot": "jumpKick", "hitLevel": "overhead", "height": "air", "startup": 0.1, "active": 0.14, "recovery": 0.22, "reach": 1.05, "hitY": 0.36, "hitW": 0.9, "hitH": 0.52, "knockback": 5.2, "hop": 4.2 }
   ],
   "combos": [
     {

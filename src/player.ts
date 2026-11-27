@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { CharacterDef } from '@src/content/schema'
 import { contextStore } from '@stores/context'
 import { loadCharacterModel } from '@src/view/model'
+import { fighterPose } from '@src/sim/pose'
 import type { FighterState } from '@src/sim/types'
 
 interface PlayerConstructor {
@@ -80,6 +81,14 @@ export default class Player {
       this.actor.scale.y = this.actor.scale.x * 0.62
       lean += -state.facing * 0.55
     }
+    const pose = fighterPose(state)
+    if (pose === 'jumpStart') {
+      this.actor.scale.y = this.actor.scale.x * 0.86
+    } else if (pose === 'jumpLand') {
+      this.actor.scale.y = this.actor.scale.x * 0.76
+    } else if (pose === 'jumpAttack' || pose === 'juggle') {
+      lean += -state.facing * 0.4
+    }
     const guarding = state.action === 'block' || state.blocking
     if (guarding) {
       lean += -state.facing * 0.5
@@ -110,10 +119,10 @@ export default class Player {
     if (!map) {
       return 'Idle'
     }
-    if (state.action === 'attackUp' || state.action === 'special') {
+    if (state.action === 'attackUp' || state.action === 'jumpPunch' || state.action === 'special') {
       return map.punchUp
     }
-    if (state.action === 'attackDown' || state.action === 'crouchPunch' || state.action === 'crouchKick') {
+    if (state.action === 'attackDown' || state.action === 'crouchPunch' || state.action === 'crouchKick' || state.action === 'jumpKick') {
       return map.punchDown
     }
     if (state.action === 'walk') {

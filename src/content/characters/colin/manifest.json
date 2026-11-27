@@ -10,6 +10,7 @@
     "punchUp": "PunchUp",
     "punchDown": "PunchDown"
   },
+  "air": { "hurtHeight": 1.2, "hurtHalfW": 0.32 },
   "model": {
     "kind": "glb",
     "file": "assets/models/Mr-Colin-Cole.glb",
@@ -20,7 +21,9 @@
     { "name": "Jab", "input": "Punch up", "damage": 9, "chip": 0.1, "slot": "attackUp", "hitLevel": "high", "height": "stand" },
     { "name": "Sweep", "input": "Punch down", "damage": 14, "chip": 0.15, "slot": "attackDown", "hitLevel": "low", "height": "stand" },
     { "name": "Crouch jab", "input": "Crouch + Punch", "damage": 7, "chip": 0.1, "slot": "crouchPunch", "hitLevel": "mid", "height": "crouch", "startup": 0.08, "active": 0.12, "recovery": 0.2, "reach": 0.86, "hitY": 0.55, "hitW": 0.7, "hitH": 0.4, "knockback": 3.4, "hop": 1.4 },
-    { "name": "Low sweep", "input": "Crouch + Kick", "damage": 12, "chip": 0.2, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.16, "active": 0.14, "recovery": 0.34, "reach": 1.08, "hitY": 0.28, "hitW": 1.05, "hitH": 0.32, "knockback": 5.6, "hop": 2.4 }
+    { "name": "Low sweep", "input": "Crouch + Kick", "damage": 12, "chip": 0.2, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.16, "active": 0.14, "recovery": 0.34, "reach": 1.08, "hitY": 0.28, "hitW": 1.05, "hitH": 0.32, "knockback": 5.6, "hop": 2.4 },
+    { "name": "Jump jab", "input": "Jump + Punch", "damage": 8, "chip": 0.1, "slot": "jumpPunch", "hitLevel": "overhead", "height": "air", "startup": 0.06, "active": 0.1, "recovery": 0.16, "reach": 0.82, "hitY": 0.42, "hitW": 0.7, "hitH": 0.55, "knockback": 3.6, "hop": 3.4 },
+    { "name": "Jump kick", "input": "Jump + Kick", "damage": 11, "chip": 0.15, "slot": "jumpKick", "hitLevel": "overhead", "height": "air", "startup": 0.08, "active": 0.12, "recovery": 0.18, "reach": 0.96, "hitY": 0.34, "hitW": 0.78, "hitH": 0.5, "knockback": 4.4, "hop": 3.8 }
   ],
   "combos": [
     {

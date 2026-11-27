@@ -21,8 +21,8 @@ function snapshot(partial: Partial<DebugSnapshot> = {}): DebugSnapshot {
     callout: null,
     projectiles: 0,
     fighters: [
-      { id: 'player1', name: 'Rio', life: 80, maxLife: 100, x: 0, y: 0, vx: 0, score: 1, action: 'idle', facing: 1, device: 'keyboard', blocking: false, crouching: false, ko: false, characterId: 'colin' },
-      { id: 'player2', name: 'CPU', life: 100, maxLife: 100, x: 1, y: 0, vx: 0, score: 0, action: 'idle', facing: -1, device: 'ai', blocking: false, crouching: false, ko: false, characterId: 'maria' },
+      { id: 'player1', name: 'Rio', life: 80, maxLife: 100, x: 0, y: 0, vx: 0, score: 1, action: 'idle', pose: 'idle', facing: 1, device: 'keyboard', blocking: false, crouching: false, ko: false, characterId: 'colin' },
+      { id: 'player2', name: 'CPU', life: 100, maxLife: 100, x: 1, y: 0, vx: 0, score: 0, action: 'idle', pose: 'idle', facing: -1, device: 'ai', blocking: false, crouching: false, ko: false, characterId: 'maria' },
     ],
     ...partial,
   }

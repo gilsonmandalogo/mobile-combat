@@ -1,3 +1,4 @@
+import { fighterPose } from '@src/sim/pose'
 import type { MatchState } from '@src/sim/types'
 
 export interface DebugFighter {
@@ -10,6 +11,7 @@ export interface DebugFighter {
   vx: number
   score: number
   action: string
+  pose: string
   facing: number
   device: string
   blocking: boolean
@@ -50,6 +52,7 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     vx: fighter.vx,
     score: fighter.score,
     action: fighter.action,
+    pose: fighterPose(fighter),
     facing: fighter.facing,
     device: fighter.device,
     blocking: fighter.blocking,

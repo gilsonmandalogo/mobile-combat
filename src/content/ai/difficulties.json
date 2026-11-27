@@ -17,7 +17,8 @@
     "specialCd": 2.4,
     "followUp": 0.08,
     "crouchBlock": 0.15,
-    "lowAttack": 0.04
+    "lowAttack": 0.04,
+    "jumpIn": 0.03
   },
   "normal": {
     "prefer": 1.55,
@@ -37,7 +38,8 @@
     "specialCd": 1.3,
     "followUp": 0.35,
     "crouchBlock": 0.55,
-    "lowAttack": 0.12
+    "lowAttack": 0.12,
+    "jumpIn": 0.1
   },
   "hard": {
     "prefer": 1.15,
@@ -57,7 +59,8 @@
     "specialCd": 0.8,
     "followUp": 0.6,
     "crouchBlock": 0.9,
-    "lowAttack": 0.22
+    "lowAttack": 0.22,
+    "jumpIn": 0.18
   },
   "nightmare": {
     "prefer": 1.05,
@@ -77,6 +80,7 @@
     "specialCd": 0.5,
     "followUp": 0.85,
     "crouchBlock": 1,
-    "lowAttack": 0.32
+    "lowAttack": 0.32,
+    "jumpIn": 0.3
   }
 }

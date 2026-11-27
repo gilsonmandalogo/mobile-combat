@@ -10,6 +10,7 @@
     "punchUp": "PunchUp",
     "punchDown": "PunchDown"
   },
+  "air": { "hurtHeight": 1.12, "hurtHalfW": 0.28 },
   "model": {
     "kind": "glb",
     "file": "assets/models/Maria-Bennett.glb",
@@ -20,7 +21,9 @@
     { "name": "Flick", "input": "Punch up", "damage": 8, "chip": 0.1, "slot": "attackUp", "hitLevel": "high", "height": "stand" },
     { "name": "Low kick", "input": "Punch down", "damage": 12, "chip": 0.2, "slot": "attackDown", "hitLevel": "low", "height": "stand" },
     { "name": "Crouch flick", "input": "Crouch + Punch", "damage": 6, "chip": 0.1, "slot": "crouchPunch", "hitLevel": "mid", "height": "crouch", "startup": 0.07, "active": 0.1, "recovery": 0.18, "reach": 0.84, "hitY": 0.5, "hitW": 0.66, "hitH": 0.36, "knockback": 3.1, "hop": 1.2 },
-    { "name": "Ankle sweep", "input": "Crouch + Kick", "damage": 11, "chip": 0.2, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.14, "active": 0.13, "recovery": 0.3, "reach": 1.12, "hitY": 0.26, "hitW": 1.08, "hitH": 0.3, "knockback": 5.2, "hop": 2.2 }
+    { "name": "Ankle sweep", "input": "Crouch + Kick", "damage": 11, "chip": 0.2, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.14, "active": 0.13, "recovery": 0.3, "reach": 1.12, "hitY": 0.26, "hitW": 1.08, "hitH": 0.3, "knockback": 5.2, "hop": 2.2 },
+    { "name": "Jump flick", "input": "Jump + Punch", "damage": 7, "chip": 0.1, "slot": "jumpPunch", "hitLevel": "overhead", "height": "air", "startup": 0.05, "active": 0.09, "recovery": 0.14, "reach": 0.8, "hitY": 0.4, "hitW": 0.64, "hitH": 0.5, "knockback": 3.2, "hop": 3.1 },
+    { "name": "Jump kick", "input": "Jump + Kick", "damage": 10, "chip": 0.15, "slot": "jumpKick", "hitLevel": "overhead", "height": "air", "startup": 0.07, "active": 0.11, "recovery": 0.16, "reach": 1.02, "hitY": 0.32, "hitW": 0.8, "hitH": 0.48, "knockback": 4.1, "hop": 3.5 }
   ],
   "combos": [
     {

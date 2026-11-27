@@ -7,7 +7,13 @@ export const ROUND_END_DELAY = 2.2
 export const INTRO_TIME = 1
 export const MOVE_SPEED = 3.4
 export const JUMP_SPEED = 7.6
+export const JUMP_CARRY = 3.1
+export const PREJUMP_TIME = 4 / 60
+export const LAND_TIME = 5 / 60
+export const KNOCKDOWN_TIME = 0.42
 export const GRAVITY = 20
+export const AIR_HURT_HEIGHT = 1.2
+export const AIR_HURT_HALF_W = 0.32
 export const STAGE_MIN_X = -6
 export const STAGE_MAX_X = 6
 export const PUSH_DISTANCE = 0.9
@@ -111,12 +117,45 @@ export const CROUCH_ATTACKS: Record<'crouchPunch' | 'crouchKick', AttackSpec> = 
   },
 }
 
+export const JUMP_ATTACKS: Record<'jumpPunch' | 'jumpKick', AttackSpec> = {
+  jumpPunch: {
+    damage: 8,
+    knockback: 3.6,
+    hitstun: 0.32,
+    startup: 0.06,
+    active: 0.1,
+    recovery: 0.16,
+    reach: 0.82,
+    hitY: 0.42,
+    hitW: 0.7,
+    hitH: 0.55,
+    hop: 3.4,
+    hitLevel: 'overhead',
+  },
+  jumpKick: {
+    damage: 11,
+    knockback: 4.4,
+    hitstun: 0.36,
+    startup: 0.08,
+    active: 0.12,
+    recovery: 0.18,
+    reach: 0.96,
+    hitY: 0.34,
+    hitW: 0.78,
+    hitH: 0.5,
+    hop: 3.8,
+    hitLevel: 'overhead',
+  },
+}
+
 export function defaultAttackBook(): Record<AttackName, AttackSpec> {
   return {
     attackUp: { ...ATTACKS.attackUp },
     attackDown: { ...ATTACKS.attackDown },
     crouchPunch: { ...CROUCH_ATTACKS.crouchPunch },
     crouchKick: { ...CROUCH_ATTACKS.crouchKick },
+    jumpPunch: { ...JUMP_ATTACKS.jumpPunch },
+    jumpKick: { ...JUMP_ATTACKS.jumpKick },
   }
 }
 

@@ -21,6 +21,7 @@ const profileSchema = z.object({
   followUp: z.number().min(0).max(1),
   crouchBlock: z.number().min(0).max(1),
   lowAttack: z.number().min(0).max(1),
+  jumpIn: z.number().min(0).max(1),
 })
 
 const tableSchema = z.object({

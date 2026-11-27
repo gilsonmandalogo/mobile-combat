@@ -632,6 +632,8 @@ function profileFrom(def: CharacterDef): FighterProfile {
     chips: attackChips(def.moves),
     combos: def.combos,
     attacks: attackBook(def.moves),
+    airHurtHeight: def.air?.hurtHeight,
+    airHurtHalfW: def.air?.hurtHalfW,
   }
 }
 

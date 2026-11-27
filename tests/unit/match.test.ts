@@ -40,7 +40,8 @@ describe('match simulation', () => {
     expect(walled.state.fighters[0].x).toBeLessThanOrEqual(6)
 
     let jumping = stepMatch(fight(), both({ jump: true }), 1 / 60)
-    expect(jumping.state.fighters[0].vy).toBeGreaterThan(0)
+    expect(jumping.state.fighters[0].action).toBe('prejump')
+    expect(jumping.state.fighters[0].y).toBe(0)
     jumping = stepSeconds(jumping.state, both(), 0.2)
     expect(jumping.state.fighters[0].y).toBeGreaterThan(0.4)
     const landed = stepSeconds(jumping.state, both(), 2)
@@ -56,7 +57,7 @@ describe('match simulation', () => {
     state = active.state
     expect(state.fighters[1].life).toBe(100 - ATTACKS.attackUp.damage)
     expect(state.fighters[1].x).toBeGreaterThan(before)
-    expect(state.fighters[1].action).toBe('hitstun')
+    expect(['hitstun', 'juggle']).toContain(state.fighters[1].action)
 
     const again = stepMatch(state, both({ attackUp: true }), 1 / 60)
     expect(again.state.fighters[1].life).toBe(state.fighters[1].life)

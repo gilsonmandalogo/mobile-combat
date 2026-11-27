@@ -100,6 +100,9 @@ export function stepAi(
   const intent: Intent = { ...EMPTY_INTENT }
   if (state === 'approach') {
     intent.move = toward
+    if (ready && distance > profile.attack && roll() < profile.jumpIn) {
+      intent.jump = true
+    }
   } else if (state === 'retreat' || state === 'evade') {
     intent.move = away
   }
@@ -115,7 +118,9 @@ export function stepAi(
   }
   if (state === 'attack') {
     const pick = roll()
-    if (pick < profile.lowAttack) {
+    if (enemy.y > 0.45) {
+      intent.attackUp = true
+    } else if (pick < profile.lowAttack) {
       intent.crouch = true
       intent.attackDown = true
     } else if (pick < profile.heavy) {
@@ -123,6 +128,10 @@ export function stepAi(
     } else {
       intent.attackUp = true
     }
+  }
+  if (self.y > 0.35 && !self.airAttack && distance < 1.5) {
+    intent.attackUp = true
+    intent.jump = false
   }
 
   return {

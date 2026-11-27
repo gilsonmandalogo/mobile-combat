@@ -100,6 +100,8 @@ export function checksum(state: MatchState): number {
     add(fighter.action)
     add(fighter.facing)
     add(fighter.crouching ? 1 : 0)
+    add(fighter.jumpDir)
+    add(fighter.airAttack ? 1 : 0)
     add(fighter.blocking ? 1 : 0)
     add(fighter.score)
     add(fighter.ko ? 1 : 0)
@@ -111,6 +113,7 @@ export function checksum(state: MatchState): number {
     add(quantize(shot.y))
     add(quantize(shot.vx))
     add(shot.damage)
+    add(shot.level)
   }
   return hash >>> 0
 }

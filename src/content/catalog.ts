@@ -66,6 +66,12 @@ export function moveSlot(move: { input: string; slot?: AttackName }): AttackName
   }
   const input = move.input.toLowerCase()
   const crouch = input.includes('crouch')
+  if (input.includes('jump') && (input.includes('kick'))) {
+    return 'jumpKick'
+  }
+  if (input.includes('jump')) {
+    return 'jumpPunch'
+  }
   if (crouch && (input.includes('kick') || input.includes('sweep'))) {
     return 'crouchKick'
   }
@@ -89,7 +95,7 @@ export function attackBook(moves: CharacterDef['moves']): Record<AttackName, Att
       continue
     }
     const next: AttackSpec = { ...book[slot], hitLevel: move.hitLevel ?? book[slot].hitLevel }
-    if (slot === 'crouchPunch' || slot === 'crouchKick') {
+    if (slot === 'crouchPunch' || slot === 'crouchKick' || slot === 'jumpPunch' || slot === 'jumpKick') {
       next.damage = move.damage
       for (const key of TIMING_KEYS) {
         const value = move[key]
@@ -109,6 +115,8 @@ export function attackChips(moves: Array<{ input: string; chip?: number; slot?: 
     attackDown: BLOCK_CHIP,
     crouchPunch: BLOCK_CHIP,
     crouchKick: BLOCK_CHIP,
+    jumpPunch: BLOCK_CHIP,
+    jumpKick: BLOCK_CHIP,
   }
   for (const move of moves) {
     const slot = moveSlot(move)

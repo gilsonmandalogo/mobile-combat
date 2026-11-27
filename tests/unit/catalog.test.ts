@@ -61,12 +61,16 @@ describe('character catalog', () => {
       attackDown: 0.15,
       crouchPunch: 0.1,
       crouchKick: 0.2,
+      jumpPunch: 0.1,
+      jumpKick: 0.15,
     })
     expect(attackChips([{ input: 'Punch up' }])).toEqual({
       attackUp: 0.2,
       attackDown: 0.2,
       crouchPunch: 0.2,
       crouchKick: 0.2,
+      jumpPunch: 0.2,
+      jumpKick: 0.2,
     })
     expect(moveList(characterById('colin'))).toContain('Crouch — hold Down')
     expect(moveList(characterById('colin'))).toContain('Low sweep — Crouch + Kick')
