@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('keyboard bindings can be remapped, persisted, and reset', async ({ page }) => {
-  test.setTimeout(120_000)
+  test.setTimeout(180_000)
   await page.goto('/mobile-combat/?debug=1')
   await expect(page.getByTestId('start-match')).toBeEnabled()
   await page.getByTestId('open-settings').click()

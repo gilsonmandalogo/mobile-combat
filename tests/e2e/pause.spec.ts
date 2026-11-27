@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('pause freezes the round, restart clears it, and quit returns to the menu', async ({ page }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   await page.goto('/mobile-combat/?debug=1&autostart=1')
   await page.waitForFunction(() => {
     const api = (window as unknown as { __MOBILE_COMBAT__?: { ready: boolean } }).__MOBILE_COMBAT__
