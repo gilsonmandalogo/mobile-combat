@@ -34,6 +34,7 @@ export interface DebugSnapshot {
   aiState: string | null
   arenaId: string
   callout: string | null
+  projectiles: number
 }
 
 export function snapshotMatch(state: MatchState, ready: boolean, aiState: string | null = null): DebugSnapshot {
@@ -71,5 +72,6 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     aiState,
     arenaId: state.arenaId,
     callout: state.callout,
+    projectiles: state.projectiles.length,
   }
 }

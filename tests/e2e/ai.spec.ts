@@ -9,5 +9,5 @@ test('the ai opponent walks in and keeps a readable state', async ({ page }) => 
   expect(state.mode).toBe('ai')
   expect(state.fighters[1].device).toBe('ai')
   expect(state.fighters[1].x).toBeLessThan(start - 0.4)
-  expect(['approach', 'attack', 'block', 'evade', 'retreat']).toContain(state.aiState)
+  expect(['approach', 'attack', 'block', 'evade', 'retreat', 'special']).toContain(state.aiState)
 })

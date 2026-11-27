@@ -1,19 +1,24 @@
 import { profileFor } from '@src/ai/profiles'
-import { attackPhase } from '@src/sim/hitboxes'
+import { intentForToken, pickSpecial, specialScript } from '@src/ai/specials'
+import type { ScriptBeat } from '@src/ai/specials'
+import { attackPhase, isAttack } from '@src/sim/hitboxes'
 import { EMPTY_INTENT } from '@src/sim/types'
 import type { Difficulty, FighterState, Intent } from '@src/sim/types'
 
-export type AiStateName = 'approach' | 'attack' | 'block' | 'evade' | 'retreat'
+export type AiStateName = 'approach' | 'attack' | 'block' | 'evade' | 'retreat' | 'special'
 
 export interface AiMemory {
   state: AiStateName
   cooldown: number
   react: number
   seed: number
+  script: ScriptBeat[]
+  hold: number
+  specialCd: number
 }
 
 export function createAiMemory(seed: number): AiMemory {
-  return { state: 'approach', cooldown: 0.3, react: 0, seed: seed >>> 0 }
+  return { state: 'approach', cooldown: 0.3, react: 0, seed: seed >>> 0, script: [], hold: 0, specialCd: 0 }
 }
 
 export function nextRng(seed: number): { seed: number; value: number } {
@@ -42,6 +47,11 @@ export function stepAi(
     return next.value
   }
 
+  const specialCd = Math.max(0, memory.specialCd - dt)
+  if (memory.script.length) {
+    return playScript(memory, self.facing, dt)
+  }
+
   const delta = enemy.x - self.x
   const distance = Math.abs(delta)
   const toward: Intent['move'] = delta === 0 ? 0 : delta > 0 ? 1 : -1
@@ -51,6 +61,7 @@ export function stepAi(
   let cooldown = Math.max(0, memory.cooldown - dt)
   let react = memory.react
   let state: AiStateName = 'approach'
+  const ready = self.hitstun <= 0 && self.blockstun <= 0 && self.y <= 0.05 && !self.ko && !isAttack(self.action)
 
   if (threat) {
     if (memory.react <= 0 && memory.state !== 'block' && memory.state !== 'evade') {
@@ -70,6 +81,8 @@ export function stepAi(
   } else if (self.life <= profile.retreatLife && distance < profile.prefer) {
     state = 'retreat'
     react = 0
+  } else if (ready && specialCd <= 0 && cooldown <= 0 && beginSpecial()) {
+    return playScript(armedSpecial(), self.facing, dt)
   } else if (distance > profile.prefer) {
     state = 'approach'
     react = 0
@@ -105,7 +118,56 @@ export function stepAi(
   }
 
   return {
-    memory: { state, cooldown, react, seed },
+    memory: { state, cooldown, react, seed, script: [], hold: 0, specialCd },
     intent,
+  }
+
+  function beginSpecial(): boolean {
+    const choice = pickSpecial(self.combos, distance, enemy)
+    if (!choice) {
+      return false
+    }
+    if (roll() >= profile.special) {
+      cooldown = profile.retry
+      return false
+    }
+    return true
+  }
+
+  function armedSpecial(): AiMemory {
+    const choice = pickSpecial(self.combos, distance, enemy)
+    const script = choice
+      ? specialScript(choice, profile.accuracy, profile.timingError, profile.followUp, roll)
+      : []
+    return {
+      state: 'special',
+      cooldown: profile.attackCd,
+      react: 0,
+      seed,
+      script,
+      hold: script[0]?.hold ?? 0,
+      specialCd: profile.specialCd,
+    }
+  }
+}
+
+function playScript(memory: AiMemory, facing: 1 | -1, dt: number): { memory: AiMemory; intent: Intent } {
+  let hold = memory.hold - dt
+  let script = memory.script
+  if (hold <= 0) {
+    script = script.slice(1)
+    hold = script[0]?.hold ?? 0
+  }
+  const beat = script[0]
+  return {
+    memory: {
+      ...memory,
+      script,
+      hold,
+      state: beat ? 'special' : 'approach',
+      cooldown: Math.max(0, memory.cooldown - dt),
+      specialCd: Math.max(0, memory.specialCd - dt),
+    },
+    intent: beat ? intentForToken(beat.token, facing) : { ...EMPTY_INTENT },
   }
 }

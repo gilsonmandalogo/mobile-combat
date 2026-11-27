@@ -19,6 +19,7 @@ function snapshot(partial: Partial<DebugSnapshot> = {}): DebugSnapshot {
     aiState: null,
     arenaId: 'mayan-temple',
     callout: null,
+    projectiles: 0,
     fighters: [
       { id: 'player1', name: 'Rio', life: 80, maxLife: 100, x: 0, y: 0, vx: 0, score: 1, action: 'idle', facing: 1, device: 'keyboard', blocking: false, ko: false, characterId: 'colin' },
       { id: 'player2', name: 'CPU', life: 100, maxLife: 100, x: 1, y: 0, vx: 0, score: 0, action: 'idle', facing: -1, device: 'ai', blocking: false, ko: false, characterId: 'maria' },
