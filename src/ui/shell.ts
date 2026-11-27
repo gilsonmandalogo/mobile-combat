@@ -391,9 +391,8 @@ export class Shell {
     this.setHidden('character-select', !(menu && this.screen === 'characters'))
     this.setHidden('arena-select', !(menu && this.screen === 'arenas'))
     this.setHidden('results-panel', state.status !== 'matchEnd' || settingsOpen)
-    const results = document.getElementById('results-title')
-    if (results && state.status === 'matchEnd') {
-      results.textContent = state.banner ?? 'Match over'
+    if (state.status === 'matchEnd') {
+      this.text('results-title', state.banner ?? 'Match over')
     }
     this.ensureFocus()
     const pause = document.getElementById('pause-menu')
@@ -420,7 +419,7 @@ export class Shell {
     hud.hidden = !view.visible
     this.text('timer', view.timer)
     this.text('round-label', view.roundLabel)
-    banner.hidden = view.banner === null
+    banner.hidden = view.banner === null || state.status === 'matchEnd'
     banner.textContent = view.banner ?? ''
     view.fighters.forEach((fighter, index) => {
       const slot = index === 0 ? 'player1' : 'player2'
