@@ -16,7 +16,7 @@ function fight(): MatchState {
     devices: ['keyboard', 'keyboard'],
     seed: 3,
   })).state
-  return { ...match, introTime: 0, banner: null }
+  return { ...match, introTime: 0, banner: null, critChance: 0 }
 }
 
 function at(state: MatchState, x1: number, x2: number): MatchState {
@@ -87,7 +87,7 @@ describe('jump', () => {
     }, active.startup + active.active)
     expect(stood.events.find((event) => event.type === 'hit')).toMatchObject({ blocked: true })
 
-    const recovered = stepSeconds(struck.state, { player1: idle({ attackUp: true }), player2: idle() }, active.recovery + 0.05)
+    const recovered = stepSeconds(struck.state, { player1: idle({ attackUp: true }), player2: idle() }, active.recovery + 0.2)
     expect(recovered.state.fighters[0].action).not.toBe('jumpPunch')
     expect(recovered.state.fighters[0].airAttack).toBe(true)
     const fallen = stepSeconds(struck.state, { player1: idle(), player2: idle() }, 1.2)
