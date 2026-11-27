@@ -99,6 +99,7 @@ export function checksum(state: MatchState): number {
     add(quantize(fighter.vy))
     add(quantize(fighter.actionTime))
     add(fighter.life)
+    add(quantize(fighter.energy))
     add(fighter.action)
     add(fighter.facing)
     add(fighter.crouching ? 1 : 0)

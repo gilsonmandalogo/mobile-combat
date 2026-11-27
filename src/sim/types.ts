@@ -39,6 +39,8 @@ export interface FighterState {
   facing: 1 | -1
   life: number
   maxLife: number
+  /** Super meter. It carries across rounds and clears when a new match starts. */
+  energy: number
   score: number
   action: Action
   actionTime: number

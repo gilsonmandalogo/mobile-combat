@@ -1,4 +1,5 @@
 import type { DebugSnapshot } from '@src/debug/snapshot'
+import { COMBAT } from '@src/sim/rules'
 
 export interface HudFighterView {
   name: string
@@ -7,6 +8,8 @@ export interface HudFighterView {
   health: number
   rounds: boolean[]
   guard: string
+  energy: number
+  meterFull: boolean
 }
 
 export interface HudView {
@@ -56,6 +59,8 @@ export function hudView(state: DebugSnapshot, gamepadIndexes: [number, number]):
       health: fighter.maxLife <= 0 ? 0 : fighter.life / fighter.maxLife,
       rounds: Array.from({ length: Math.max(1, state.roundsToWin) }, (_, index) => fighter.score > index),
       guard: fighter.blocking ? 'BLOCK' : '',
+      energy: COMBAT.energyMax <= 0 ? 0 : Math.min(1, fighter.energy / COMBAT.energyMax),
+      meterFull: fighter.energy >= COMBAT.energyMax - 0.001,
     })) as [HudFighterView, HudFighterView],
   }
 }

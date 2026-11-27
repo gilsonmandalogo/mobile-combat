@@ -1,4 +1,9 @@
 {
   "roundsToWin": 2,
-  "maxRounds": 5
+  "maxRounds": 5,
+  "energyMax": 100,
+  "energyOnDeal": 0.55,
+  "energyOnTake": 0.22,
+  "energyOnBlock": 0.15,
+  "energyCarry": true
 }

@@ -6,6 +6,7 @@ export interface DebugFighter {
   name: string
   life: number
   maxLife: number
+  energy: number
   x: number
   y: number
   vx: number
@@ -48,6 +49,7 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     name: fighter.name,
     life: fighter.life,
     maxLife: fighter.maxLife,
+    energy: fighter.energy,
     x: fighter.x,
     y: fighter.y,
     vx: fighter.vx,

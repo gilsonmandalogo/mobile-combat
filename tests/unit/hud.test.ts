@@ -22,8 +22,8 @@ function snapshot(partial: Partial<DebugSnapshot> = {}): DebugSnapshot {
     callout: null,
     projectiles: 0,
     fighters: [
-      { id: 'player1', name: 'Rio', life: 80, maxLife: 100, x: 0, y: 0, vx: 0, score: 1, action: 'idle', pose: 'idle', facing: 1, device: 'keyboard', blocking: false, crouching: false, ko: false, characterId: 'colin' },
-      { id: 'player2', name: 'CPU', life: 100, maxLife: 100, x: 1, y: 0, vx: 0, score: 0, action: 'idle', pose: 'idle', facing: -1, device: 'ai', blocking: false, crouching: false, ko: false, characterId: 'maria' },
+      { id: 'player1', name: 'Rio', life: 80, maxLife: 100, energy: 20, x: 0, y: 0, vx: 0, score: 1, action: 'idle', pose: 'idle', facing: 1, device: 'keyboard', blocking: false, crouching: false, ko: false, characterId: 'colin' },
+      { id: 'player2', name: 'CPU', life: 100, maxLife: 100, energy: 100, x: 1, y: 0, vx: 0, score: 0, action: 'idle', pose: 'idle', facing: -1, device: 'ai', blocking: false, crouching: false, ko: false, characterId: 'maria' },
     ],
     ...partial,
   }
@@ -42,7 +42,8 @@ describe('hud', () => {
     expect(view.timer).toBe('60')
     expect(view.roundLabel).toBe('Round 1')
     expect(view.banner).toBeNull()
-    expect(view.fighters[0]).toMatchObject({ name: 'Rio', device: 'Keyboard', life: 80, health: 0.8, rounds: [true, false], guard: '' })
+    expect(view.fighters[0]).toMatchObject({ name: 'Rio', device: 'Keyboard', life: 80, health: 0.8, rounds: [true, false], guard: '', energy: 0.2, meterFull: false })
+    expect(view.fighters[1].meterFull).toBe(true)
     expect(view.fighters[1].device).toBe('AI')
     const guarding = hudView(snapshot({
       callout: 'BLOCK',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { attackChips, characterById } from '@src/content/catalog'
 import { ATTACKS, ROUND_END_DELAY } from '@src/sim/constants'
+import { COMBAT } from '@src/sim/rules'
 import { createMatch, pauseMatch, quitToMenu, restartMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
 import { EMPTY_INTENT } from '@src/sim/types'
 import type { FighterId, Intent, MatchState } from '@src/sim/types'
@@ -448,6 +449,30 @@ describe('character specials', () => {
     expect(next.state.fighters[1].life).toBe(100)
     expect(next.state.fighters[0].life).toBe(100)
     expect(next.state.banner).toBe('Round 2')
+  })
+
+  it('fills the meter from damage and keeps it into the next round', () => {
+    let state = place(fight(), 0, 0.95)
+    const hit = stepSeconds(state, both({ attackDown: true }), 0.4)
+    expect(COMBAT.energyCarry).toBe(true)
+    expect(hit.state.fighters[0].energy).toBeGreaterThan(0)
+    expect(hit.state.fighters[1].energy).toBeGreaterThan(0)
+    expect(hit.state.fighters[1].energy).toBeLessThan(hit.state.fighters[0].energy)
+    const stored = hit.state.fighters[0].energy
+    let finishing = place(hit.state, 0, 0.95)
+    finishing = {
+      ...finishing,
+      fighters: [
+        finishing.fighters[0],
+        { ...finishing.fighters[1], life: 1 },
+      ],
+    }
+    const ko = stepSeconds(finishing, both({ attackDown: true }), 0.4)
+    const next = stepSeconds(ko.state, both(), ROUND_END_DELAY + 0.05)
+    expect(next.state.fighters[0].life).toBe(100)
+    expect(next.state.fighters[0].energy).toBeGreaterThanOrEqual(stored)
+    const restarted = restartMatch(next.state)
+    expect(restarted.fighters[0].energy).toBe(0)
   })
 
   it('draws a round when the clock ends on equal life and stops at roundsToWin', () => {

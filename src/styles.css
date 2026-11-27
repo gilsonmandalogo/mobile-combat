@@ -355,6 +355,55 @@ canvas {
   transition: transform 0.55s ease 0.18s;
 }
 
+.meter {
+  position: relative;
+  height: 8px;
+  width: min(320px, 34vw);
+  margin-top: 4px;
+  background: #141820;
+  border: 1px solid #3d4e68;
+  overflow: hidden;
+}
+
+.hud-side.right .meter {
+  transform: scaleX(-1);
+}
+
+.meter-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(90deg, #1d4e86, #7fd0ff);
+  transition: transform 0.28s linear;
+}
+
+.meter-tag {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  color: #041018;
+  opacity: 0;
+}
+
+.meter.is-full .meter-fill {
+  background: linear-gradient(90deg, #f0d56a, #fff6c8);
+  animation: meter-pulse 0.9s ease-in-out infinite;
+}
+
+.meter.is-full .meter-tag {
+  opacity: 1;
+  font-weight: 700;
+}
+
+@keyframes meter-pulse {
+  50% { filter: brightness(1.45); }
+}
+
 .health.is-hit {
   animation: health-flash 0.35s ease;
 }

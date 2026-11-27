@@ -39,6 +39,7 @@ export function createFighter(
     facing,
     life: maxLife,
     maxLife,
+    energy: 0,
     score: 0,
     action: 'idle',
     actionTime: 0,
@@ -146,7 +147,7 @@ export function startMatch(state: MatchState): StepResult {
     ...state,
     winner: null,
     matchPending: false,
-    fighters: state.fighters.map((fighter) => ({ ...fighter, score: 0 })) as MatchState['fighters'],
+    fighters: state.fighters.map((fighter) => ({ ...fighter, score: 0, energy: 0 })) as MatchState['fighters'],
   }, 1)
   return { state: reset, events: [{ type: 'roundStart', round: 1 }] }
 }
@@ -334,6 +335,7 @@ function resetFighter(fighter: FighterState, x: number, facing: 1 | -1): Fighter
     vy: 0,
     facing,
     life: fighter.maxLife,
+    energy: COMBAT.energyCarry ? fighter.energy : 0,
     action: 'idle',
     actionTime: 0,
     blocking: false,
@@ -529,6 +531,22 @@ function shotFrom(before: FighterState, after: FighterState): ProjectileState | 
   }
 }
 
+function grantEnergy(fighter: FighterState, amount: number): FighterState {
+  if (amount <= 0) {
+    return fighter
+  }
+  return { ...fighter, energy: Math.min(COMBAT.energyMax, fighter.energy + amount) }
+}
+
+function payMeter(attacker: FighterState, defender: FighterState, damage: number, blocked: boolean): { attacker: FighterState; defender: FighterState } {
+  const dealt = damage * (blocked ? COMBAT.energyOnBlock : COMBAT.energyOnDeal)
+  const taken = damage * (blocked ? COMBAT.energyOnBlock : COMBAT.energyOnTake)
+  return {
+    attacker: grantEnergy(attacker, dealt),
+    defender: grantEnergy(defender, taken),
+  }
+}
+
 function resolveBoth(first: FighterState, second: FighterState): { first: FighterState; second: FighterState; events: GameEvent[] } {
   const events: GameEvent[] = []
   const toSecond = previewHit(first, second)
@@ -539,6 +557,9 @@ function resolveBoth(first: FighterState, second: FighterState): { first: Fighte
   if (toSecond) {
     nextFirst = { ...nextFirst, attackResolved: true }
     nextSecond = receiveHit(nextSecond, toSecond)
+    const paid = payMeter(nextFirst, nextSecond, toSecond.damage, toSecond.blocked)
+    nextFirst = paid.attacker
+    nextSecond = paid.defender
     events.push(toSecond.event)
     if (nextSecond.ko) {
       events.push({ type: 'ko', fighter: nextSecond.id })
@@ -548,6 +569,9 @@ function resolveBoth(first: FighterState, second: FighterState): { first: Fighte
   if (toFirst) {
     nextSecond = { ...nextSecond, attackResolved: true }
     nextFirst = receiveHit(nextFirst, toFirst)
+    const paid = payMeter(nextSecond, nextFirst, toFirst.damage, toFirst.blocked)
+    nextSecond = paid.attacker
+    nextFirst = paid.defender
     events.push(toFirst.event)
     if (nextFirst.ko) {
       events.push({ type: 'ko', fighter: nextFirst.id })
@@ -767,10 +791,13 @@ function stepProjectiles(
       event: { type: 'hit', attacker: moved.owner, defender: defender.id, damage, blocked },
     }
     const hurt = receiveHit(defender, hit)
+    const paid = payMeter(attacker, hurt, damage, blocked)
     if (moved.owner === 'player1') {
-      right = hurt
+      left = paid.attacker
+      right = paid.defender
     } else {
-      left = hurt
+      right = paid.attacker
+      left = paid.defender
     }
     events.push(hit.event)
     if (hurt.ko) {

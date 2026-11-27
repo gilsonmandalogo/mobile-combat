@@ -471,6 +471,7 @@ export class Shell {
       this.text(`life-${slot}`, String(fighter.life))
       this.text(`guard-${slot}`, fighter.guard)
       this.paintHealth(slot, fighter.health)
+      this.paintMeter(slot, fighter.energy, fighter.meterFull)
       const pips = document.querySelector(`[data-testid="rounds-${slot}"]`)
       if (pips) {
         pips.replaceChildren()
@@ -481,6 +482,16 @@ export class Shell {
         }
       }
     })
+  }
+
+  private paintMeter(slot: 'player1' | 'player2', ratio: number, full: boolean) {
+    const meter = document.querySelector(`[data-testid="meter-${slot}"]`)
+    const fill = document.querySelector(`[data-testid="meter-fill-${slot}"]`)
+    if (!(meter instanceof HTMLElement) || !(fill instanceof HTMLElement)) {
+      return
+    }
+    fill.style.transform = `scaleX(${Math.min(1, Math.max(0, ratio))})`
+    meter.classList.toggle('is-full', full)
   }
 
   private paintHealth(slot: 'player1' | 'player2', ratio: number) {
