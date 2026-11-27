@@ -49,6 +49,7 @@ export default class Game {
   private hitBoxes = [new THREE.Box3(), new THREE.Box3()]
   private hurtHelpers: THREE.Box3Helper[]
   private hitHelpers: THREE.Box3Helper[]
+  private shots: THREE.Mesh[] = []
 
   constructor({ roundTime, enterArena }: GameConstructor) {
     this.roundTime = roundTime
@@ -329,6 +330,28 @@ export default class Game {
       this.hurtHelpers[index].visible = showDebug
       this.hitHelpers[index].visible = showDebug && hitbox(fighter) !== null
     })
+    this.syncShots()
+  }
+
+  private syncShots() {
+    const live = this.match.projectiles
+    const scene = contextStore.get().scene
+    while (this.shots.length < live.length) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 10, 8),
+        new THREE.MeshStandardMaterial({ color: '#ffb15a', emissive: '#ff6a1a', emissiveIntensity: 0.85 }),
+      )
+      mesh.castShadow = true
+      scene.add(mesh)
+      this.shots.push(mesh)
+    }
+    this.shots.forEach((mesh, index) => {
+      const shot = live[index]
+      mesh.visible = Boolean(shot)
+      if (shot) {
+        mesh.position.set(shot.x, shot.y, 0)
+      }
+    })
   }
 
   private present(animate: boolean, delta: number) {
@@ -383,6 +406,7 @@ function profileFrom(def: CharacterDef): FighterProfile {
     maxLife: def.stats.health,
     speed: def.stats.speed,
     damageScale: def.stats.damage,
+    combos: def.combos,
   }
 }
 

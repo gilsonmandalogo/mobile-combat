@@ -19,5 +19,24 @@
   "moves": [
     { "name": "Hammer", "input": "Punch up", "damage": 12 },
     { "name": "Stomp", "input": "Punch down", "damage": 19 }
+  ],
+  "combos": [
+    {
+      "id": "riser",
+      "name": "Riser",
+      "sequence": ["forward", "up", "punch"],
+      "window": 0.55,
+      "damage": 22,
+      "effect": "uppercut",
+      "startup": 0.1,
+      "active": 0.14,
+      "recovery": 0.34,
+      "reach": 0.85,
+      "hitY": 1.45,
+      "hitW": 0.7,
+      "hitH": 0.7,
+      "knockback": 5,
+      "hop": 8.5
+    }
   ]
 }

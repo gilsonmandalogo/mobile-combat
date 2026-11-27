@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { characterById, defaultPicks, loadCharacters, stepRoster } from '@src/content/catalog'
+import { characterById, defaultPicks, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import { CatalogError } from '@src/content/schema'
 
 describe('character catalog', () => {
@@ -48,5 +48,12 @@ describe('character catalog', () => {
     const picks = defaultPicks(roster)
     expect(roster[picks.player1].id).toBe('colin')
     expect(roster[picks.player2].id).toBe('maria')
+  })
+
+  it('lists a different special for each fighter', () => {
+    const effects = ['colin', 'maria', 'brute'].flatMap((id) => characterById(id).combos.map((combo) => combo.effect))
+    expect(effects.sort()).toEqual(['dash', 'projectile', 'teleport', 'uppercut'])
+    expect(moveList(characterById('colin'))).toContain('Ember — back, forward, punch')
+    expect(moveList(characterById('brute'))).toContain('Riser — forward, up, punch')
   })
 })

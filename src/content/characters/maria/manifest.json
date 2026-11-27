@@ -19,5 +19,41 @@
   "moves": [
     { "name": "Flick", "input": "Punch up", "damage": 8 },
     { "name": "Low kick", "input": "Punch down", "damage": 12 }
+  ],
+  "combos": [
+    {
+      "id": "needle",
+      "name": "Needle",
+      "sequence": ["back", "forward", "kick"],
+      "window": 0.5,
+      "damage": 12,
+      "effect": "dash",
+      "startup": 0.06,
+      "active": 0.18,
+      "recovery": 0.22,
+      "reach": 1.15,
+      "hitY": 1.05,
+      "hitW": 0.7,
+      "hitH": 0.55,
+      "knockback": 5.5,
+      "hop": 0
+    },
+    {
+      "id": "slip",
+      "name": "Slip",
+      "sequence": ["back", "up", "kick"],
+      "window": 0.5,
+      "damage": 10,
+      "effect": "teleport",
+      "startup": 0.08,
+      "active": 0.12,
+      "recovery": 0.3,
+      "reach": 0.95,
+      "hitY": 1.05,
+      "hitW": 0.7,
+      "hitH": 0.6,
+      "knockback": 4,
+      "hop": 0
+    }
   ]
 }

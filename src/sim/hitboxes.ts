@@ -1,18 +1,29 @@
 import { ATTACKS, HURT_HALF_W, HURT_HEIGHT } from '@src/sim/constants'
-import type { Aabb, AttackName, FighterState } from '@src/sim/types'
+import type { AttackSpec } from '@src/sim/constants'
+import type { Aabb, FighterState } from '@src/sim/types'
 
 export type AttackPhase = 'startup' | 'active' | 'recovery'
 
-export function isAttack(action: FighterState['action']): action is AttackName {
-  return action === 'attackUp' || action === 'attackDown'
+export function isAttack(action: FighterState['action']): boolean {
+  return action === 'attackUp' || action === 'attackDown' || action === 'special'
+}
+
+export function attackSpec(fighter: FighterState): AttackSpec | null {
+  if (fighter.action === 'attackUp' || fighter.action === 'attackDown') {
+    return ATTACKS[fighter.action]
+  }
+  if (fighter.action === 'special' && fighter.special && fighter.special.effect !== 'projectile') {
+    return fighter.special
+  }
+  return null
 }
 
 export function attackPhase(fighter: FighterState): AttackPhase | null {
-  if (!isAttack(fighter.action)) {
+  const spec = attackSpec(fighter)
+  if (!spec) {
     return null
   }
 
-  const spec = ATTACKS[fighter.action]
   if (fighter.actionTime < spec.startup) {
     return 'startup'
   }
@@ -38,11 +49,11 @@ export function hurtbox(fighter: FighterState): Aabb {
 }
 
 export function hitbox(fighter: FighterState): Aabb | null {
-  if (attackPhase(fighter) !== 'active' || !isAttack(fighter.action)) {
+  const spec = attackSpec(fighter)
+  if (attackPhase(fighter) !== 'active' || !spec) {
     return null
   }
 
-  const spec = ATTACKS[fighter.action]
   const centerX = fighter.x + fighter.facing * spec.reach
   return {
     minX: centerX - spec.hitW / 2,

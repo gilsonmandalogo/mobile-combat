@@ -1,5 +1,7 @@
 export type FighterId = 'player1' | 'player2'
-export type Action = 'idle' | 'walk' | 'jump' | 'attackUp' | 'attackDown' | 'block' | 'hitstun' | 'ko'
+export type Action = 'idle' | 'walk' | 'jump' | 'attackUp' | 'attackDown' | 'special' | 'block' | 'hitstun' | 'ko'
+export type InputToken = 'back' | 'forward' | 'up' | 'punch' | 'kick'
+export type SpecialEffect = 'projectile' | 'dash' | 'uppercut' | 'teleport'
 export type DeviceKind = 'keyboard' | 'gamepad' | 'ai'
 export type MatchStatus = 'menu' | 'running' | 'paused' | 'roundEnd' | 'matchEnd'
 export type Difficulty = 'easy' | 'normal' | 'hard'
@@ -44,6 +46,8 @@ export interface FighterState {
   characterId: string
   speed: number
   damageScale: number
+  combos: ComboSpec[]
+  special: ActiveSpecial | null
 }
 
 export interface MatchState {
@@ -64,6 +68,8 @@ export interface MatchState {
   banner: string | null
   bannerTime: number
   seed: number
+  projectiles: ProjectileState[]
+  motions: Record<FighterId, MotionMemory>
 }
 
 export interface Aabb {
@@ -74,7 +80,7 @@ export interface Aabb {
 }
 
 export type GameEvent =
-  | { type: 'attack'; fighter: FighterId; attack: AttackName }
+  | { type: 'attack'; fighter: FighterId; attack: AttackName | 'special' }
   | { type: 'hit'; attacker: FighterId; defender: FighterId; damage: number; blocked: boolean }
   | { type: 'ko'; fighter: FighterId }
   | { type: 'roundEnd'; winner: FighterId | 'draw'; round: number }
@@ -96,4 +102,55 @@ export interface FighterProfile {
   maxLife?: number
   speed?: number
   damageScale?: number
+  combos?: ComboSpec[]
+}
+
+export interface ComboSpec {
+  id: string
+  name: string
+  sequence: InputToken[]
+  window: number
+  damage: number
+  effect: SpecialEffect
+  startup: number
+  active: number
+  recovery: number
+  reach: number
+  hitY: number
+  hitW: number
+  hitH: number
+  knockback: number
+  hop: number
+}
+
+export interface ActiveSpecial extends ComboSpec {
+  hitstun: number
+  applied: boolean
+}
+
+export interface StampedToken {
+  token: InputToken
+  age: number
+}
+
+export interface MotionMemory {
+  tokens: StampedToken[]
+  move: -1 | 0 | 1
+  jump: boolean
+  attackUp: boolean
+  attackDown: boolean
+}
+
+export interface ProjectileState {
+  owner: FighterId
+  x: number
+  y: number
+  vx: number
+  ttl: number
+  damage: number
+  knockback: number
+  hitstun: number
+  hop: number
+  w: number
+  h: number
 }

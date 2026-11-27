@@ -5,7 +5,7 @@ import { buttonName } from '@src/input/gamepad'
 import type { PadBindings } from '@src/input/gamepad'
 import { deviceValue, readMatchSetup } from '@src/ui/setup'
 import { hudView } from '@src/ui/hud'
-import { defaultPicks, loadCharacters, stepRoster } from '@src/content/catalog'
+import { defaultPicks, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import type { Difficulty, MatchMode } from '@src/sim/types'
 import type { PadSnapshot } from '@src/input/gamepad'
 
@@ -137,6 +137,9 @@ export class Shell {
     const pause = document.getElementById('pause-menu')
     if (pause) {
       pause.hidden = state.status !== 'paused' || settingsOpen
+      if (!pause.hidden) {
+        this.renderMoveList()
+      }
     }
     this.renderHud(state)
   }
@@ -334,6 +337,31 @@ export class Shell {
     }
     this.listening = null
     this.renderSettings()
+  }
+
+  private renderMoveList() {
+    const root = document.getElementById('move-list')
+    if (!root || !this.lastState) {
+      return
+    }
+    root.replaceChildren()
+    for (const fighter of this.lastState.fighters) {
+      const def = this.roster.find((character) => character.id === fighter.characterId)
+      if (!def) {
+        continue
+      }
+      const column = document.createElement('div')
+      const heading = document.createElement('p')
+      heading.className = 'move-heading'
+      heading.textContent = def.name
+      column.append(heading)
+      for (const line of moveList(def)) {
+        const row = document.createElement('p')
+        row.textContent = line
+        column.append(row)
+      }
+      root.append(column)
+    }
   }
 
   private renderRoster() {

@@ -1,7 +1,8 @@
 import { ATTACKS, BLOCK_CHIP, GRAVITY, INTRO_TIME, JUMP_SPEED, KNOCKBACK_DECAY, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, SPAWN_X, STAGE_MAX_X, STAGE_MIN_X, attackDuration } from '@src/sim/constants'
-import { attackPhase, hitbox, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
+import { bestCombo, emptyMotion, holdsJump, pushMotion } from '@src/sim/buffer'
+import { attackPhase, attackSpec, hitbox, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
 import { EMPTY_INTENT } from '@src/sim/types'
-import type { FighterId, FighterProfile, FighterState, GameEvent, Intent, MatchOptions, MatchState } from '@src/sim/types'
+import type { ActiveSpecial, ComboSpec, FighterId, FighterProfile, FighterState, GameEvent, Intent, MatchOptions, MatchState, ProjectileState } from '@src/sim/types'
 
 export interface StepResult {
   state: MatchState
@@ -48,6 +49,8 @@ export function createFighter(
     characterId: profile.characterId ?? 'colin',
     speed: profile.speed ?? MOVE_SPEED,
     damageScale: profile.damageScale ?? 1,
+    combos: profile.combos ?? [],
+    special: null,
   }
 }
 
@@ -71,6 +74,8 @@ export function createMatch(options: MatchOptions): MatchState {
     banner: null,
     bannerTime: 0,
     seed: options.seed,
+    projectiles: [],
+    motions: { player1: emptyMotion(), player2: emptyMotion() },
   }
 }
 
@@ -104,6 +109,7 @@ function profileOf(fighter: FighterState): FighterProfile {
     maxLife: fighter.maxLife,
     speed: fighter.speed,
     damageScale: fighter.damageScale,
+    combos: fighter.combos,
   }
 }
 
@@ -232,6 +238,8 @@ function startRound(state: MatchState, round: number): MatchState {
     roundWinner: null,
     matchPending: false,
     winner: null,
+    projectiles: [],
+    motions: { player1: emptyMotion(), player2: emptyMotion() },
     fighters: [
       resetFighter(state.fighters[0], -SPAWN_X, 1),
       resetFighter(state.fighters[1], SPAWN_X, -1),
@@ -255,6 +263,7 @@ function resetFighter(fighter: FighterState, x: number, facing: 1 | -1): Fighter
     invuln: 0,
     attackResolved: false,
     ko: false,
+    special: null,
   }
 }
 
@@ -322,6 +331,10 @@ function concludeRound(state: MatchState, reason: 'ko' | 'time'): StepResult {
   }
 }
 
+const DASH_SPEED = 10.5
+const TELEPORT_GAP = 1.45
+const SHOT_SPEED = 9
+
 function integrate(
   state: MatchState,
   intent1: Intent,
@@ -333,13 +346,37 @@ function integrate(
   const [rawA, rawB] = state.fighters
   const facedA = faceOpponent(rawA, rawB)
   const facedB = faceOpponent(rawB, rawA)
-  const steppedA = stepFighter(facedA, intent1, dt)
-  const steppedB = stepFighter(facedB, intent2, dt)
+  let motions = state.motions
+  let comboA: ComboSpec | null = null
+  let comboB: ComboSpec | null = null
+  let trapA = false
+  let trapB = false
+  if (resolveHits) {
+    const recA = pushMotion(motions.player1, intent1, facedA.facing, dt)
+    const recB = pushMotion(motions.player2, intent2, facedB.facing, dt)
+    motions = { player1: recA.memory, player2: recB.memory }
+    comboA = canStart(facedA) ? bestCombo(recA.memory.tokens, facedA.combos, recA.fresh) : null
+    comboB = canStart(facedB) ? bestCombo(recB.memory.tokens, facedB.combos, recB.fresh) : null
+    trapA = holdsJump(recA.memory.tokens, facedA.combos)
+    trapB = holdsJump(recB.memory.tokens, facedB.combos)
+  }
+  const steppedA = stepFighter(facedA, intent1, dt, comboA, facedB, trapA)
+  const steppedB = stepFighter(facedB, intent2, dt, comboB, facedA, trapB)
   pushAttack(events, facedA, steppedA)
   pushAttack(events, facedB, steppedB)
 
   let first = steppedA
   let second = steppedB
+  const shotA = shotFrom(facedA, first)
+  const shotB = shotFrom(facedB, second)
+  if (shotA && first.special) {
+    first = { ...first, special: { ...first.special, applied: true } }
+  }
+  if (shotB && second.special) {
+    second = { ...second, special: { ...second.special, applied: true } }
+  }
+  const spawned = [shotA, shotB].filter((shot): shot is ProjectileState => shot !== null)
+  let projectiles = spawned.length ? state.projectiles.concat(spawned) : state.projectiles
   const separated = separate(first, second)
   first = separated[0]
   second = separated[1]
@@ -349,17 +386,52 @@ function integrate(
     first = resolved.first
     second = resolved.second
     events.push(...resolved.events)
+    const shots = stepProjectiles(projectiles, first, second, dt)
+    first = shots.first
+    second = shots.second
+    projectiles = shots.projectiles
+    events.push(...shots.events)
   }
 
   return {
-    state: { ...state, fighters: [first, second] },
+    state: { ...state, fighters: [first, second], motions, projectiles },
     events,
   }
 }
 
 function pushAttack(events: GameEvent[], before: FighterState, after: FighterState) {
-  if (!isAttack(before.action) && isAttack(after.action)) {
+  if (isAttack(before.action) || !isAttack(after.action)) {
+    return
+  }
+  if (after.action === 'attackUp' || after.action === 'attackDown' || after.action === 'special') {
     events.push({ type: 'attack', fighter: after.id, attack: after.action })
+  }
+}
+
+function canStart(fighter: FighterState): boolean {
+  return !fighter.ko && fighter.hitstun <= 0 && !isAttack(fighter.action)
+}
+
+function shotFrom(before: FighterState, after: FighterState): ProjectileState | null {
+  const special = after.special
+  if (after.action !== 'special' || !special || special.effect !== 'projectile' || special.applied) {
+    return null
+  }
+  if (before.action !== 'special' || after.actionTime < special.startup) {
+    return null
+  }
+  return {
+    owner: after.id,
+    x: after.x + after.facing * 0.8,
+    y: special.hitY,
+    vx: after.facing * SHOT_SPEED,
+    ttl: 1.4,
+    damage: Math.max(1, Math.round(special.damage * after.damageScale)),
+    knockback: special.knockback,
+    hitstun: special.hitstun,
+    hop: special.hop,
+    w: special.hitW,
+    h: special.hitH,
   }
 }
 
@@ -405,7 +477,10 @@ function previewHit(attacker: FighterState, defender: FighterState): HitPreview 
     return null
   }
 
-  const spec = ATTACKS[attacker.action]
+  const spec = attackSpec(attacker)
+  if (!spec) {
+    return null
+  }
   const rawDamage = Math.max(1, Math.round(spec.damage * attacker.damageScale))
   const facesAttacker = (defender.facing === 1 && attacker.x >= defender.x)
     || (defender.facing === -1 && attacker.x <= defender.x)
@@ -446,7 +521,124 @@ function receiveHit(defender: FighterState, hit: HitPreview): FighterState {
   }
 }
 
-function stepFighter(fighter: FighterState, intent: Intent, dt: number): FighterState {
+function continueAttack(base: FighterState, fighter: FighterState, dt: number): FighterState | null {
+  if (fighter.action !== 'attackUp' && fighter.action !== 'attackDown' && fighter.action !== 'special') {
+    return null
+  }
+  const spec = fighter.action === 'special' ? fighter.special : ATTACKS[fighter.action]
+  if (!spec) {
+    return null
+  }
+  const actionTime = fighter.actionTime + dt
+  if (actionTime >= attackDuration(spec)) {
+    return null
+  }
+  const vertical = integrateVertical(fighter.y, fighter.vy, dt)
+  const dashing = fighter.action === 'special' && fighter.special?.effect === 'dash' && actionTime < spec.startup + spec.active
+  const vx = dashing ? fighter.facing * DASH_SPEED : decay(fighter.vx, dt)
+  return {
+    ...base,
+    action: fighter.action,
+    actionTime,
+    x: clampX(fighter.x + vx * dt),
+    vx,
+    y: vertical.y,
+    vy: vertical.vy,
+    blocking: false,
+  }
+}
+
+function beginSpecial(base: FighterState, fighter: FighterState, combo: ComboSpec, opponent: FighterState): FighterState {
+  const special: ActiveSpecial = {
+    ...combo,
+    hitstun: 0.42,
+    applied: combo.effect === 'teleport',
+  }
+  let x = fighter.x
+  let vy = 0
+  let vx = 0
+  if (combo.effect === 'teleport') {
+    x = opponent.x + fighter.facing * TELEPORT_GAP
+  } else if (combo.effect === 'uppercut') {
+    vy = combo.hop > 0 ? combo.hop : 8
+  } else if (combo.effect === 'dash') {
+    vx = fighter.facing * DASH_SPEED
+  }
+  return {
+    ...base,
+    action: 'special',
+    actionTime: 0,
+    attackResolved: false,
+    special,
+    x: clampX(x),
+    y: 0,
+    vy,
+    vx,
+    blocking: false,
+  }
+}
+
+function stepProjectiles(
+  projectiles: ProjectileState[],
+  first: FighterState,
+  second: FighterState,
+  dt: number,
+): { projectiles: ProjectileState[]; first: FighterState; second: FighterState; events: GameEvent[] } {
+  const events: GameEvent[] = []
+  let left = first
+  let right = second
+  const next = projectiles.flatMap((shot) => {
+    const moved: ProjectileState = { ...shot, x: shot.x + shot.vx * dt, ttl: shot.ttl - dt }
+    if (moved.ttl <= 0 || Math.abs(moved.x) > STAGE_MAX_X + 2) {
+      return []
+    }
+    const defender = moved.owner === 'player1' ? right : left
+    const attacker = moved.owner === 'player1' ? left : right
+    const box = {
+      minX: moved.x - moved.w / 2,
+      maxX: moved.x + moved.w / 2,
+      minY: moved.y - moved.h / 2,
+      maxY: moved.y + moved.h / 2,
+    }
+    if (defender.ko || defender.invuln > 0 || !overlaps(box, hurtbox(defender))) {
+      return [moved]
+    }
+    const faces = (defender.facing === 1 && moved.x >= defender.x)
+      || (defender.facing === -1 && moved.x <= defender.x)
+    const blocked = defender.blocking && faces && defender.y < 0.35
+    const damage = blocked ? Math.max(1, Math.round(moved.damage * BLOCK_CHIP)) : moved.damage
+    const dir = Math.sign(defender.x - moved.x) || attacker.facing
+    const hit: HitPreview = {
+      damage,
+      blocked,
+      knockback: dir * (blocked ? moved.knockback * 0.25 : moved.knockback),
+      hitstun: blocked ? moved.hitstun * 0.45 : moved.hitstun,
+      hop: blocked ? 0 : moved.hop,
+      event: { type: 'hit', attacker: moved.owner, defender: defender.id, damage, blocked },
+    }
+    const hurt = receiveHit(defender, hit)
+    if (moved.owner === 'player1') {
+      right = hurt
+    } else {
+      left = hurt
+    }
+    events.push(hit.event)
+    if (hurt.ko) {
+      events.push({ type: 'ko', fighter: hurt.id })
+    }
+    return []
+  })
+  return { projectiles: next, first: left, second: right, events }
+}
+
+function stepFighter(
+  fighter: FighterState,
+  intent: Intent,
+  dt: number,
+  combo: ComboSpec | null,
+  opponent: FighterState,
+  trapJump = false,
+): FighterState {
   const hitstun = Math.max(0, fighter.hitstun - dt)
   const invuln = Math.max(0, fighter.invuln - dt)
   const base = { ...fighter, hitstun, invuln }
@@ -480,22 +672,9 @@ function stepFighter(fighter: FighterState, intent: Intent, dt: number): Fighter
     }
   }
 
-  if (isAttack(fighter.action)) {
-    const spec = ATTACKS[fighter.action]
-    const actionTime = fighter.actionTime + dt
-    const vertical = integrateVertical(fighter.y, fighter.vy, dt)
-    if (actionTime < attackDuration(spec)) {
-      return {
-        ...base,
-        action: fighter.action,
-        actionTime,
-        x: clampX(fighter.x + fighter.vx * dt),
-        vx: decay(fighter.vx, dt),
-        y: vertical.y,
-        vy: vertical.vy,
-        blocking: false,
-      }
-    }
+  const continued = continueAttack(base, fighter, dt)
+  if (continued) {
+    return continued
   }
 
   const vertical = integrateVertical(fighter.y, fighter.vy, dt)
@@ -515,6 +694,10 @@ function stepFighter(fighter: FighterState, intent: Intent, dt: number): Fighter
     vx = intent.move * speed
   }
 
+  if (combo && grounded) {
+    return beginSpecial(base, fighter, combo, opponent)
+  }
+
   if (grounded && (intent.attackUp || intent.attackDown)) {
     const attack = intent.attackUp ? 'attackUp' : 'attackDown'
     return {
@@ -522,6 +705,7 @@ function stepFighter(fighter: FighterState, intent: Intent, dt: number): Fighter
       action: attack,
       actionTime: 0,
       attackResolved: false,
+      special: null,
       x: clampX(fighter.x),
       y: 0,
       vy: 0,
@@ -530,7 +714,7 @@ function stepFighter(fighter: FighterState, intent: Intent, dt: number): Fighter
     }
   }
 
-  if (intent.jump && grounded && !intent.block) {
+  if (intent.jump && grounded && !intent.block && !trapJump) {
     return {
       ...base,
       action: 'jump',
@@ -553,6 +737,7 @@ function stepFighter(fighter: FighterState, intent: Intent, dt: number): Fighter
     vy: vertical.vy,
     vx,
     blocking: action === 'block',
+    special: null,
   }
 }
 

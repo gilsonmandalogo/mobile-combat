@@ -171,6 +171,24 @@ canvas {
   outline: 2px solid var(--gold);
 }
 
+.move-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 1rem;
+  text-align: left;
+  font-size: 0.82rem;
+  margin: 0.2rem 0 0.45rem;
+}
+
+.move-list p {
+  margin: 0.12rem 0;
+}
+
+.move-heading {
+  color: var(--gold);
+  margin-top: 0.4rem;
+}
+
 .menu-actions {
   display: flex;
   flex-direction: column;

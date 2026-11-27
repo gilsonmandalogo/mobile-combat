@@ -24,6 +24,13 @@ export function defaultPicks(roster: Array<{ id: string }>): { player1: number; 
   return { player1, player2: maria >= 0 ? maria : player1 }
 }
 
+export function moveList(def: CharacterDef): string[] {
+  return [
+    ...def.moves.map((move) => `${move.name} — ${move.input}`),
+    ...def.combos.map((combo) => `${combo.name} — ${combo.sequence.join(', ')}`),
+  ]
+}
+
 export function stepRoster(index: number, delta: number, count: number): number {
   if (count <= 0) {
     return 0

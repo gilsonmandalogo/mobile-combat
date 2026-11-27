@@ -19,5 +19,24 @@
   "moves": [
     { "name": "Jab", "input": "Punch up", "damage": 9 },
     { "name": "Sweep", "input": "Punch down", "damage": 14 }
+  ],
+  "combos": [
+    {
+      "id": "ember",
+      "name": "Ember",
+      "sequence": ["back", "forward", "punch"],
+      "window": 0.55,
+      "damage": 16,
+      "effect": "projectile",
+      "startup": 0.12,
+      "active": 0.08,
+      "recovery": 0.28,
+      "reach": 0.8,
+      "hitY": 1.15,
+      "hitW": 0.42,
+      "hitH": 0.42,
+      "knockback": 5,
+      "hop": 0
+    }
   ]
 }

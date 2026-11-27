@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { characterById } from '@src/content/catalog'
 import { ATTACKS, ROUND_END_DELAY } from '@src/sim/constants'
 import { createMatch, pauseMatch, quitToMenu, restartMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
 import { EMPTY_INTENT } from '@src/sim/types'
@@ -209,5 +210,74 @@ describe('match simulation', () => {
     expect(restarted.fighters[0].life).toBe(86)
     expect(restarted.fighters[0].speed).toBe(6)
     expect(restarted.fighters[1].maxLife).toBe(130)
+  })
+})
+
+function rosterFight(leftId: string, rightId: string): MatchState {
+  const left = characterById(leftId)
+  const right = characterById(rightId)
+  const started = startMatch(createMatch({
+    mode: 'local',
+    difficulty: 'normal',
+    roundTime: 20,
+    names: [left.name, right.name],
+    devices: ['keyboard', 'keyboard'],
+    seed: 1,
+    profiles: [
+      { characterId: left.id, maxLife: left.stats.health, speed: left.stats.speed, damageScale: left.stats.damage, combos: left.combos },
+      { characterId: right.id, maxLife: right.stats.health, speed: right.stats.speed, damageScale: right.stats.damage, combos: right.combos },
+    ],
+  }))
+  return { ...started.state, introTime: 0, banner: null }
+}
+
+function tap(state: MatchState, intent: Partial<Intent>, seconds: number): MatchState {
+  return stepSeconds(state, both(intent), seconds).state
+}
+
+describe('character specials', () => {
+  it('throws a projectile that damages a fighter outside jab range', () => {
+    let state = place(rosterFight('colin', 'maria'), -1.5, 2.4)
+    state = tap(state, { move: -1 }, 0.08)
+    state = tap(state, {}, 0.04)
+    state = tap(state, { move: 1 }, 0.08)
+    state = tap(state, {}, 0.04)
+    state = tap(state, { attackUp: true }, 0.05)
+    expect(state.fighters[0].action).toBe('special')
+    const landed = tap(state, {}, 1)
+    expect(landed.fighters[1].life).toBeLessThan(characterById('maria').stats.health)
+    expect(landed.projectiles.length).toBe(0)
+  })
+
+  it('dashes, uppercuts, and teleports from each character manifest', () => {
+    let dash = place(rosterFight('maria', 'colin'), -3, 3)
+    dash = tap(dash, { move: -1 }, 0.06)
+    dash = tap(dash, {}, 0.04)
+    dash = tap(dash, { move: 1 }, 0.06)
+    dash = tap(dash, {}, 0.04)
+    const beforeDash = dash.fighters[0].x
+    dash = tap(dash, { attackDown: true }, 0.05)
+    expect(dash.fighters[0].special?.effect).toBe('dash')
+    const dashed = tap(dash, {}, 0.2)
+    expect(dashed.fighters[0].x - beforeDash).toBeGreaterThan(1.6)
+
+    let upper = place(rosterFight('brute', 'colin'), -2, 2.5)
+    upper = tap(upper, { move: 1 }, 0.06)
+    upper = tap(upper, {}, 0.04)
+    upper = tap(upper, { jump: true }, 0.05)
+    expect(upper.fighters[0].y).toBe(0)
+    upper = tap(upper, { attackUp: true }, 0.05)
+    expect(upper.fighters[0].special?.effect).toBe('uppercut')
+    const risen = tap(upper, {}, 0.18)
+    expect(risen.fighters[0].y).toBeGreaterThan(0.4)
+
+    let slip = place(rosterFight('maria', 'colin'), -2, 1.5)
+    slip = tap(slip, { move: -1 }, 0.06)
+    slip = tap(slip, {}, 0.04)
+    slip = tap(slip, { jump: true }, 0.05)
+    expect(slip.fighters[0].y).toBe(0)
+    slip = tap(slip, { attackDown: true }, 0.05)
+    expect(slip.fighters[0].special?.effect).toBe('teleport')
+    expect(slip.fighters[0].x).toBeGreaterThan(slip.fighters[1].x)
   })
 })
