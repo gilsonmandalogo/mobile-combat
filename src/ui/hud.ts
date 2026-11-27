@@ -28,6 +28,17 @@ export function deviceLabel(device: string, gamepadIndex = 0): string {
   return 'Keyboard'
 }
 
+/** A drop at least this fraction of the bar shakes and flashes. */
+export const BIG_HIT = 0.12
+
+export function healthMotion(previous: number, next: number): { snap: boolean; shake: boolean } {
+  if (previous < 0) {
+    return { snap: true, shake: false }
+  }
+  const drop = previous - next
+  return { snap: drop <= 0.004, shake: drop >= BIG_HIT }
+}
+
 export function hudView(state: DebugSnapshot, gamepadIndexes: [number, number]): HudView {
   const showBanner = Boolean(state.banner) && (
     state.introTime > 0 || state.status === 'roundEnd' || state.status === 'matchEnd'

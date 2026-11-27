@@ -4,7 +4,7 @@ import type { DebugSnapshot } from '@src/debug/snapshot'
 import { buttonName } from '@src/input/gamepad'
 import type { PadBindings } from '@src/input/gamepad'
 import { deviceValue, parseDifficulty, readMatchSetup } from '@src/ui/setup'
-import { hudView } from '@src/ui/hud'
+import { healthMotion, hudView } from '@src/ui/hud'
 import { defaultArena, defaultPicks, loadArenas, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import { focusItems, moveFocus, paintFocus } from '@src/ui/focus'
 import type { FocusDirection } from '@src/ui/focus'
@@ -53,6 +53,9 @@ export class Shell {
   private arenas = loadArenas()
   private arenaPick = defaultArena(this.arenas)
   private arenaAxis = 0
+  private healthShown: Record<'player1' | 'player2', number> = { player1: -1, player2: -1 }
+  private bannerText = ''
+  private closers = new Map<string, () => void>()
 
   constructor(private host: MatchHost) {}
 
@@ -403,12 +406,10 @@ export class Shell {
       this.text('results-title', state.banner ?? 'Match over')
     }
     this.ensureFocus()
-    const pause = document.getElementById('pause-menu')
-    if (pause) {
-      pause.hidden = state.status !== 'paused' || settingsOpen
-      if (!pause.hidden) {
-        this.renderMoveList()
-      }
+    const showPause = state.status === 'paused' && !settingsOpen
+    this.setHidden('pause-menu', !showPause)
+    if (showPause) {
+      this.renderMoveList()
     }
     this.renderHud(state)
   }
@@ -428,18 +429,25 @@ export class Shell {
     this.text('timer', view.timer)
     this.text('round-label', view.roundLabel)
     this.text('combat-callout', view.callout)
-    banner.hidden = view.banner === null || state.status === 'matchEnd'
-    banner.textContent = view.banner ?? ''
+    const bannerText = view.banner ?? ''
+    const hideBanner = view.banner === null || state.status === 'matchEnd'
+    if (banner.hidden !== hideBanner || banner.textContent !== bannerText) {
+      banner.hidden = hideBanner
+      banner.textContent = bannerText
+      banner.classList.remove('banner-pop', 'banner-ko')
+      if (!hideBanner && bannerText && bannerText !== this.bannerText) {
+        void banner.offsetWidth
+        banner.classList.add(bannerText === 'K.O.' ? 'banner-ko' : 'banner-pop')
+      }
+      this.bannerText = bannerText
+    }
     view.fighters.forEach((fighter, index) => {
       const slot = index === 0 ? 'player1' : 'player2'
       this.text(`hud-name-${slot}`, fighter.name)
       this.text(`hud-device-${slot}`, fighter.device)
       this.text(`life-${slot}`, String(fighter.life))
       this.text(`guard-${slot}`, fighter.guard)
-      const bar = document.querySelector(`[data-testid="health-${slot}"]`)
-      if (bar instanceof HTMLElement) {
-        bar.style.transform = `scaleX(${fighter.health})`
-      }
+      this.paintHealth(slot, fighter.health)
       const pips = document.querySelector(`[data-testid="rounds-${slot}"]`)
       if (pips) {
         pips.replaceChildren()
@@ -450,6 +458,34 @@ export class Shell {
         }
       }
     })
+  }
+
+  private paintHealth(slot: 'player1' | 'player2', ratio: number) {
+    const fill = document.querySelector(`[data-testid="health-${slot}"]`)
+    const trail = document.querySelector(`[data-testid="health-trail-${slot}"]`)
+    if (!(fill instanceof HTMLElement) || !(trail instanceof HTMLElement)) {
+      return
+    }
+    const previous = this.healthShown[slot]
+    fill.style.transform = `scaleX(${ratio})`
+    if (previous >= 0 && Math.abs(previous - ratio) <= 0.004) {
+      this.healthShown[slot] = ratio
+      return
+    }
+    const motion = healthMotion(previous, ratio)
+    trail.style.transition = motion.snap ? 'none' : ''
+    trail.style.transform = `scaleX(${ratio})`
+    trail.dataset.from = (motion.snap ? ratio : previous).toFixed(3)
+    trail.dataset.to = ratio.toFixed(3)
+    const bar = fill.parentElement
+    if (motion.shake && bar) {
+      bar.classList.remove('is-hit')
+      bar.parentElement?.classList.remove('is-hit')
+      void bar.offsetWidth
+      bar.classList.add('is-hit')
+      bar.parentElement?.classList.add('is-hit')
+    }
+    this.healthShown[slot] = ratio
   }
 
   private text(id: string, value: string) {
@@ -470,7 +506,7 @@ export class Shell {
     if (show) {
       this.renderSettings()
     }
-    panel.hidden = !show
+    this.setHidden('settings-panel', !show)
     if (this.lastState) {
       this.render(this.lastState)
     }
@@ -626,9 +662,40 @@ export class Shell {
 
   private setHidden(id: string, hidden: boolean) {
     const element = document.getElementById(id)
-    if (element) {
-      element.hidden = hidden
+    if (!element) {
+      return
     }
+    const finish = this.closers.get(id)
+    if (!hidden) {
+      finish?.()
+      element.classList.remove('is-closing')
+      element.hidden = false
+      return
+    }
+    if (element.hidden || element.classList.contains('is-closing')) {
+      return
+    }
+    const animated = element.classList.contains('panel') || element.id === 'title-screen'
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!animated || reduce) {
+      element.hidden = true
+      return
+    }
+    element.classList.add('is-closing')
+    const done = () => {
+      element.removeEventListener('animationend', done)
+      this.closers.delete(id)
+      if (!element.classList.contains('is-closing')) {
+        return
+      }
+      element.classList.remove('is-closing')
+      element.hidden = true
+    }
+    this.closers.set(id, () => {
+      element.removeEventListener('animationend', done)
+      this.closers.delete(id)
+    })
+    element.addEventListener('animationend', done)
   }
 
   private renderMoveList() {

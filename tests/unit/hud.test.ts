@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deviceLabel, hudView } from '@src/ui/hud'
+import { deviceLabel, healthMotion, hudView } from '@src/ui/hud'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 
 function snapshot(partial: Partial<DebugSnapshot> = {}): DebugSnapshot {
@@ -57,5 +57,13 @@ describe('hud', () => {
     expect(ko.banner).toBe('K.O.')
     const menu = hudView(snapshot({ status: 'menu', banner: 'Round 1', introTime: 1 }), [0, 0])
     expect(menu.visible).toBe(false)
+  })
+
+  it('snaps a heal and shakes a large drop', () => {
+    expect(healthMotion(-1, 1)).toEqual({ snap: true, shake: false })
+    expect(healthMotion(1, 1)).toEqual({ snap: true, shake: false })
+    expect(healthMotion(0.5, 0.8)).toEqual({ snap: true, shake: false })
+    expect(healthMotion(1, 0.96)).toEqual({ snap: false, shake: false })
+    expect(healthMotion(1, 0.8)).toEqual({ snap: false, shake: true })
   })
 })

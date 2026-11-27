@@ -251,15 +251,29 @@ canvas {
 }
 
 .panel button,
-#title-start {
+#title-start,
+.roster-card {
   cursor: pointer;
   background: #3a2a16;
   color: var(--gold);
   letter-spacing: 0.04em;
+  transition: transform 0.14s ease, background-color 0.14s ease, border-color 0.14s ease;
 }
 
 .panel button:hover:not(:disabled),
-#title-start:hover:not(:disabled) {
+#title-start:hover:not(:disabled),
+.roster-card:hover,
+.panel button.is-focused,
+.panel select.is-focused,
+.panel input.is-focused,
+#title-start.is-focused,
+.roster-card.is-focused {
+  transform: translateY(-2px);
+}
+
+.panel button:hover:not(:disabled),
+#title-start:hover:not(:disabled),
+.roster-card:hover {
   background: #4d381c;
 }
 
@@ -305,6 +319,7 @@ canvas {
 }
 
 .health {
+  position: relative;
   height: 16px;
   width: min(320px, 34vw);
   background: #2a1a16;
@@ -316,11 +331,41 @@ canvas {
   transform: scaleX(-1);
 }
 
-.health > div {
-  height: 100%;
+.health-fill,
+.health-trail {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  background: linear-gradient(90deg, #6d1d16, var(--hp));
   transform-origin: left center;
+}
+
+.health-fill {
+  background: linear-gradient(90deg, #6d1d16, var(--hp));
+  z-index: 1;
+}
+
+.health-trail {
+  background: #f0d2a4;
+  transition: transform 0.55s ease 0.18s;
+}
+
+.health.is-hit {
+  animation: health-flash 0.35s ease;
+}
+
+.hud-side.is-hit {
+  animation: health-shake 0.35s ease;
+}
+
+@keyframes health-flash {
+  0%, 100% { filter: none; }
+  30% { filter: brightness(2.1); }
+}
+
+@keyframes health-shake {
+  20% { transform: translateX(-5px); }
+  45% { transform: translateX(4px); }
+  70% { transform: translateX(-2px); }
 }
 
 .life-num,
@@ -387,6 +432,42 @@ canvas {
   pointer-events: none;
 }
 
+#banner.banner-pop {
+  animation: banner-pop 0.45s ease;
+}
+
+#banner.banner-ko {
+  animation: banner-ko 0.55s ease;
+}
+
+@keyframes banner-pop {
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(0.82); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes banner-ko {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.55); filter: brightness(2); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: none; }
+}
+
+.panel.is-closing {
+  pointer-events: none;
+  animation: drop-panel 0.22s ease forwards;
+}
+
+#title-screen.is-closing {
+  pointer-events: none;
+  animation: drop-title 0.22s ease forwards;
+}
+
+@keyframes drop-panel {
+  to { opacity: 0; transform: translate(-50%, -46%); }
+}
+
+@keyframes drop-title {
+  to { opacity: 0; transform: translateY(12px); }
+}
+
 .settings-panel {
   width: min(680px, calc(100vw - 1.5rem));
   height: min(86vh, 760px);
@@ -423,5 +504,16 @@ canvas {
 @media (max-width: 640px) {
   .player-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
