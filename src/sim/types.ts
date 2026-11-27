@@ -72,6 +72,8 @@ export interface MatchState {
   mode: MatchMode
   difficulty: Difficulty
   round: number
+  roundsToWin: number
+  maxRounds: number
   roundTime: number
   timeLeft: number
   introTime: number
@@ -111,6 +113,8 @@ export interface MatchOptions {
   mode: MatchMode
   difficulty: Difficulty
   roundTime: number
+  roundsToWin?: number
+  maxRounds?: number
   names: [string, string]
   devices: [DeviceKind, DeviceKind]
   seed: number

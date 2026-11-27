@@ -187,7 +187,7 @@ describe('match simulation', () => {
     const ko = stepSeconds(state, both({ attackDown: true }), 0.4)
     expect(ko.events.some((event) => event.type === 'ko' && event.fighter === 'player2')).toBe(true)
     expect(ko.state.status).toBe('roundEnd')
-    expect(ko.state.banner).toBe('K.O.')
+    expect(ko.state.banner).toBe('Flawless victory')
     expect(ko.state.fighters[0].score).toBe(1)
     expect(ko.state.fighters[1].ko).toBe(true)
 
@@ -413,5 +413,72 @@ describe('character specials', () => {
     slip = tap(slip, { attackDown: true }, 0.05)
     expect(slip.fighters[0].special?.effect).toBe('teleport')
     expect(slip.fighters[0].x).toBeGreaterThan(slip.fighters[1].x)
+  })
+
+  it('shows Round, then Fight, and calls a flawless only when the winner is untouched', () => {
+    const started = startMatch(createMatch({
+      mode: 'local',
+      difficulty: 'normal',
+      roundTime: 20,
+      names: ['Red', 'Blue'],
+      devices: ['keyboard', 'keyboard'],
+      seed: 2,
+    })).state
+    const early = stepMatch(started, both(), 0.05)
+    expect(early.state.banner).toBe('Round 1')
+    const fight = stepSeconds(early.state, both(), 0.6)
+    expect(fight.state.banner).toBe('Fight!')
+    const live = stepSeconds(fight.state, both(), 0.6)
+    expect(live.state.introTime).toBe(0)
+    expect(live.state.banner).toBeNull()
+
+    let hurt = place(live.state, 0, 0.95)
+    hurt = {
+      ...hurt,
+      fighters: [
+        { ...hurt.fighters[0], life: 80 },
+        { ...hurt.fighters[1], life: ATTACKS.attackDown.damage },
+      ],
+    }
+    const ko = stepSeconds(hurt, both({ attackDown: true }), 0.4)
+    expect(ko.state.banner).toBe('K.O.')
+    const next = stepSeconds(ko.state, both(), ROUND_END_DELAY + 0.05)
+    expect(next.state.round).toBe(2)
+    expect(next.state.fighters[0].x).toBeLessThan(0)
+    expect(next.state.fighters[1].life).toBe(100)
+    expect(next.state.fighters[0].life).toBe(100)
+    expect(next.state.banner).toBe('Round 2')
+  })
+
+  it('draws a round when the clock ends on equal life and stops at roundsToWin', () => {
+    let state = fight()
+    state = {
+      ...state,
+      roundsToWin: 1,
+      timeLeft: 0.02,
+      fighters: [
+        { ...state.fighters[0], life: 50 },
+        { ...state.fighters[1], life: 50 },
+      ],
+    }
+    const drawn = stepSeconds(state, both(), 0.1)
+    expect(drawn.state.roundWinner).toBe('draw')
+    expect(drawn.state.banner).toBe('Draw')
+    expect(drawn.state.fighters[0].score).toBe(0)
+    expect(drawn.state.matchPending).toBe(false)
+
+    let lead = fight()
+    lead = {
+      ...lead,
+      roundsToWin: 1,
+      timeLeft: 0.02,
+      fighters: [
+        { ...lead.fighters[0], life: 40 },
+        { ...lead.fighters[1], life: 70 },
+      ],
+    }
+    const won = stepSeconds(lead, both(), 0.1)
+    expect(won.state.matchPending).toBe(true)
+    expect(won.state.winner).toBe('player2')
   })
 })

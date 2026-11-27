@@ -90,6 +90,7 @@ export function checksum(state: MatchState): number {
   const quantize = (value: number) => Math.round(value * 1000)
   add(state.status)
   add(state.round)
+  add(state.roundsToWin)
   add(quantize(state.timeLeft))
   for (const fighter of state.fighters) {
     add(quantize(fighter.x))

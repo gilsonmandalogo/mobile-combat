@@ -1,8 +1,6 @@
 import type { AttackName, HitLevel } from '@src/sim/types'
 
 export const MAX_LIFE = 100
-export const ROUNDS_TO_WIN = 2
-export const MAX_ROUNDS = 5
 export const ROUND_END_DELAY = 2.2
 export const INTRO_TIME = 1
 export const MOVE_SPEED = 3.4

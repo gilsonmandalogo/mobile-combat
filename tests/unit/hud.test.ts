@@ -9,6 +9,7 @@ function snapshot(partial: Partial<DebugSnapshot> = {}): DebugSnapshot {
     mode: 'local',
     difficulty: 'normal',
     round: 1,
+    roundsToWin: 2,
     timeLeft: 59.2,
     introTime: 0,
     banner: null,

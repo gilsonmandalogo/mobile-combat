@@ -26,6 +26,7 @@ export interface DebugSnapshot {
   mode: string
   difficulty: string
   round: number
+  roundsToWin: number
   timeLeft: number
   introTime: number
   banner: string | null
@@ -67,6 +68,7 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     mode: state.mode,
     difficulty: state.difficulty,
     round: state.round,
+    roundsToWin: state.roundsToWin,
     timeLeft: state.timeLeft,
     introTime: state.introTime,
     banner: state.banner,

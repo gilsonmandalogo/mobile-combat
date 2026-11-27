@@ -5,7 +5,7 @@ export interface HudFighterView {
   device: string
   life: number
   health: number
-  rounds: [boolean, boolean]
+  rounds: boolean[]
   guard: string
 }
 
@@ -54,7 +54,7 @@ export function hudView(state: DebugSnapshot, gamepadIndexes: [number, number]):
       device: deviceLabel(fighter.device, gamepadIndexes[index]),
       life: fighter.life,
       health: fighter.maxLife <= 0 ? 0 : fighter.life / fighter.maxLife,
-      rounds: [fighter.score >= 1, fighter.score >= 2] as [boolean, boolean],
+      rounds: Array.from({ length: Math.max(1, state.roundsToWin) }, (_, index) => fighter.score > index),
       guard: fighter.blocking ? 'BLOCK' : '',
     })) as [HudFighterView, HudFighterView],
   }

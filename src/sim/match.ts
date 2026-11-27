@@ -1,4 +1,5 @@
-import { AIR_HURT_HALF_W, AIR_HURT_HEIGHT, BLOCK_CHIP, BLOCK_PUSH, BLOCK_STUN_MIN, BLOCK_STUN_SCALE, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_CARRY, JUMP_SPEED, KNOCKBACK_DECAY, KNOCKDOWN_TIME, LAND_TIME, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PREJUMP_TIME, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, attackDuration, defaultAttackBook } from '@src/sim/constants'
+import { AIR_HURT_HALF_W, AIR_HURT_HEIGHT, BLOCK_CHIP, BLOCK_PUSH, BLOCK_STUN_MIN, BLOCK_STUN_SCALE, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_CARRY, JUMP_SPEED, KNOCKBACK_DECAY, KNOCKDOWN_TIME, LAND_TIME, MAX_LIFE, MOVE_SPEED, PREJUMP_TIME, PUSH_DISTANCE, ROUND_END_DELAY, attackDuration, defaultAttackBook } from '@src/sim/constants'
+import { COMBAT } from '@src/sim/rules'
 import type { ArenaBounds } from '@src/sim/constants'
 import { bestCombo, emptyMotion, holdsJump, pushMotion } from '@src/sim/buffer'
 import { attackPhase, attackSpec, blocksStrike, hitbox, hitLevelOf, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
@@ -70,6 +71,8 @@ export function createMatch(options: MatchOptions): MatchState {
     mode: options.mode,
     difficulty: options.difficulty,
     round: 1,
+    roundsToWin: options.roundsToWin ?? COMBAT.roundsToWin,
+    maxRounds: options.maxRounds ?? COMBAT.maxRounds,
     roundTime: options.roundTime,
     timeLeft: options.roundTime,
     introTime: 0,
@@ -97,6 +100,8 @@ export function restartMatch(state: MatchState): MatchState {
     mode: state.mode,
     difficulty: state.difficulty,
     roundTime: state.roundTime,
+    roundsToWin: state.roundsToWin,
+    maxRounds: state.maxRounds,
     names: [state.fighters[0].name, state.fighters[1].name],
     devices: [state.fighters[0].device, state.fighters[1].device],
     seed: state.seed,
@@ -111,6 +116,8 @@ export function quitToMenu(state: MatchState): MatchState {
     mode: state.mode,
     difficulty: state.difficulty,
     roundTime: state.roundTime,
+    roundsToWin: state.roundsToWin,
+    maxRounds: state.maxRounds,
     names: [state.fighters[0].name, state.fighters[1].name],
     devices: [state.fighters[0].device, state.fighters[1].device],
     seed: state.seed,
@@ -215,11 +222,16 @@ export function stepMatch(state: MatchState, intents: Record<FighterId, Intent>,
   if (state.introTime > 0) {
     const introTime = Math.max(0, state.introTime - dt)
     const stepped = integrate(state, EMPTY_INTENT, EMPTY_INTENT, dt, false)
+    const banner = introTime <= 0
+      ? null
+      : introTime > INTRO_TIME * 0.5
+        ? `Round ${state.round}`
+        : 'Fight!'
     return {
       state: fadeCallout({
         ...stepped.state,
         introTime,
-        banner: introTime > 0 ? state.banner : null,
+        banner,
       }, dt),
       events: [],
     }
@@ -365,10 +377,9 @@ function concludeRound(state: MatchState, reason: 'ko' | 'time'): StepResult {
 
   const score1 = fighters[0].score
   const score2 = fighters[1].score
-  const matchPending = score1 >= ROUNDS_TO_WIN
-    || score2 >= ROUNDS_TO_WIN
-    || (state.round >= 3 && score1 !== score2)
-    || state.round >= MAX_ROUNDS
+  const matchPending = score1 >= state.roundsToWin
+    || score2 >= state.roundsToWin
+    || state.round >= state.maxRounds
 
   let winner: FighterId | null = null
   if (matchPending) {
@@ -380,11 +391,15 @@ function concludeRound(state: MatchState, reason: 'ko' | 'time'): StepResult {
   }
 
   const winnerName = roundWinner === 'draw' ? null : nameOf({ ...state, fighters }, roundWinner)
-  const banner = reason === 'ko'
-    ? 'K.O.'
-    : roundWinner === 'draw' || !winnerName
-      ? 'Draw'
-      : `${winnerName} takes the round`
+  const winnerFighter = roundWinner === 'draw' ? null : fighters.find((fighter) => fighter.id === roundWinner)
+  const flawless = Boolean(winnerFighter && winnerFighter.life >= winnerFighter.maxLife)
+  const banner = flawless
+    ? 'Flawless victory'
+    : reason === 'ko'
+      ? 'K.O.'
+      : roundWinner === 'draw' || !winnerName
+        ? 'Draw'
+        : `${winnerName} takes the round`
 
   return {
     state: {
