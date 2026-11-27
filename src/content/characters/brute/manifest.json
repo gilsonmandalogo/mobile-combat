@@ -17,8 +17,8 @@
     "license": "Original procedural model, MIT, no third-party mesh."
   },
   "moves": [
-    { "name": "Hammer", "input": "Punch up", "damage": 12 },
-    { "name": "Stomp", "input": "Punch down", "damage": 19 }
+    { "name": "Hammer", "input": "Punch up", "damage": 12, "chip": 0.2 },
+    { "name": "Stomp", "input": "Punch down", "damage": 19, "chip": 0.3 }
   ],
   "combos": [
     {
@@ -36,7 +36,8 @@
       "hitW": 0.7,
       "hitH": 0.7,
       "knockback": 5,
-      "hop": 8.5
+      "hop": 8.5,
+      "chip": 0.5
     }
   ]
 }

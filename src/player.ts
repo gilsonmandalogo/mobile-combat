@@ -73,6 +73,11 @@ export default class Player {
     this.actor.rotation.y = state.facing === 1 ? Math.PI / 2 : -Math.PI / 2
     const fall = state.action === 'ko' ? Math.min(1, state.actionTime / 0.45) : 0
     let lean = -state.facing * fall * (Math.PI / 2.4)
+    const guarding = state.action === 'block' || state.blocking
+    if (guarding) {
+      lean += -state.facing * 0.5
+      this.actor.position.y -= 0.1
+    }
     if (this.primitive && (state.action === 'attackUp' || state.action === 'attackDown' || state.action === 'special')) {
       lean += -state.facing * 0.35
       this.actor.position.y += Math.sin(Math.min(1, state.actionTime) * Math.PI) * 0.08
@@ -137,7 +142,10 @@ export default class Player {
   private tint(flash: number, blocking: boolean) {
     for (const [material, original] of this.emissive) {
       const standard = material as THREE.MeshStandardMaterial
-      if (flash > 0) {
+      if (flash > 0 && blocking) {
+        standard.emissive.setHex(0x9fd0ff)
+        standard.emissiveIntensity = 0.95
+      } else if (flash > 0) {
         standard.emissive.setHex(0xff2a1a)
         standard.emissiveIntensity = 0.85
       } else if (blocking) {

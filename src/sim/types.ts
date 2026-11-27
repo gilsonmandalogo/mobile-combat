@@ -40,6 +40,7 @@ export interface FighterState {
   action: Action
   actionTime: number
   blocking: boolean
+  blockstun: number
   hitstun: number
   invuln: number
   attackResolved: boolean
@@ -48,6 +49,7 @@ export interface FighterState {
   characterId: string
   speed: number
   damageScale: number
+  chips: AttackChips
   combos: ComboSpec[]
   special: ActiveSpecial | null
 }
@@ -74,6 +76,8 @@ export interface MatchState {
   motions: Record<FighterId, MotionMemory>
   arenaId: string
   arena: ArenaBounds
+  callout: string | null
+  calloutTime: number
 }
 
 export interface Aabb {
@@ -108,7 +112,13 @@ export interface FighterProfile {
   maxLife?: number
   speed?: number
   damageScale?: number
+  chips?: AttackChips
   combos?: ComboSpec[]
+}
+
+export interface AttackChips {
+  attackUp: number
+  attackDown: number
 }
 
 export interface ComboSpec {
@@ -127,6 +137,8 @@ export interface ComboSpec {
   hitH: number
   knockback: number
   hop: number
+  /** Fraction of damage that lands while blocking. Omitted means the default chip. */
+  chip?: number
 }
 
 export interface ActiveSpecial extends ComboSpec {
@@ -159,4 +171,5 @@ export interface ProjectileState {
   hop: number
   w: number
   h: number
+  chip: number
 }

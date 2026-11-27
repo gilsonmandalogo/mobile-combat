@@ -19,10 +19,13 @@ const primitiveModelSchema = z.object({
   license: z.string().min(1),
 })
 
+const chipSchema = z.number().min(0).max(1)
+
 export const moveSchema = z.object({
   name: z.string().min(1),
   input: z.string().min(1),
   damage: z.number().positive(),
+  chip: chipSchema.optional(),
 })
 
 export const tokenSchema = z.enum(['back', 'forward', 'up', 'punch', 'kick'])
@@ -43,6 +46,7 @@ export const comboSchema = z.object({
   hitH: z.number().positive(),
   knockback: z.number().nonnegative(),
   hop: z.number().nonnegative(),
+  chip: chipSchema.optional(),
 })
 
 export const characterSchema = z.object({

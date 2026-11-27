@@ -1,5 +1,7 @@
 import { CatalogError, arenaSchema, characterSchema, folderId, formatIssues } from '@src/content/schema'
 import type { ArenaDef, CharacterDef } from '@src/content/schema'
+import { BLOCK_CHIP } from '@src/sim/constants'
+import type { AttackChips } from '@src/sim/types'
 
 const characterModules = import.meta.glob('./characters/*/manifest.json', {
   eager: true,
@@ -48,9 +50,17 @@ export function defaultPicks(roster: Array<{ id: string }>): { player1: number; 
 
 export function moveList(def: CharacterDef): string[] {
   return [
+    'Block — hold Block',
     ...def.moves.map((move) => `${move.name} — ${move.input}`),
     ...def.combos.map((combo) => `${combo.name} — ${combo.sequence.join(', ')}`),
   ]
+}
+
+export function attackChips(moves: Array<{ input: string; chip?: number }>): AttackChips {
+  const ratio = (move: { chip?: number } | undefined) => move?.chip === undefined ? BLOCK_CHIP : move.chip
+  const up = moves.find((move) => /up/i.test(move.input)) ?? moves[0]
+  const down = moves.find((move) => /down/i.test(move.input)) ?? moves[1] ?? moves[0]
+  return { attackUp: ratio(up), attackDown: ratio(down) }
 }
 
 export function stepRoster(index: number, delta: number, count: number): number {

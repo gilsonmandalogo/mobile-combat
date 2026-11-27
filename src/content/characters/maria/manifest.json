@@ -17,8 +17,8 @@
     "license": "Existing project model shipped with Mobile Combat."
   },
   "moves": [
-    { "name": "Flick", "input": "Punch up", "damage": 8 },
-    { "name": "Low kick", "input": "Punch down", "damage": 12 }
+    { "name": "Flick", "input": "Punch up", "damage": 8, "chip": 0.1 },
+    { "name": "Low kick", "input": "Punch down", "damage": 12, "chip": 0.2 }
   ],
   "combos": [
     {
@@ -36,7 +36,8 @@
       "hitW": 0.7,
       "hitH": 0.55,
       "knockback": 5.5,
-      "hop": 0
+      "hop": 0,
+      "chip": 0.3
     },
     {
       "id": "slip",
@@ -53,7 +54,8 @@
       "hitW": 0.7,
       "hitH": 0.6,
       "knockback": 4,
-      "hop": 0
+      "hop": 0,
+      "chip": 0.25
     }
   ]
 }

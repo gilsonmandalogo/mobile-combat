@@ -1,4 +1,4 @@
-import { ATTACKS, BLOCK_CHIP, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_SPEED, KNOCKBACK_DECAY, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, attackDuration } from '@src/sim/constants'
+import { ATTACKS, BLOCK_CHIP, BLOCK_PUSH, BLOCK_STUN_MIN, BLOCK_STUN_SCALE, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_SPEED, KNOCKBACK_DECAY, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, attackDuration } from '@src/sim/constants'
 import type { ArenaBounds } from '@src/sim/constants'
 import { bestCombo, emptyMotion, holdsJump, pushMotion } from '@src/sim/buffer'
 import { attackPhase, attackSpec, hitbox, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
@@ -42,6 +42,7 @@ export function createFighter(
     action: 'idle',
     actionTime: 0,
     blocking: false,
+    blockstun: 0,
     hitstun: 0,
     invuln: 0,
     attackResolved: false,
@@ -50,6 +51,7 @@ export function createFighter(
     characterId: profile.characterId ?? 'colin',
     speed: profile.speed ?? MOVE_SPEED,
     damageScale: profile.damageScale ?? 1,
+    chips: profile.chips ?? { attackUp: BLOCK_CHIP, attackDown: BLOCK_CHIP },
     combos: profile.combos ?? [],
     special: null,
   }
@@ -79,6 +81,8 @@ export function createMatch(options: MatchOptions): MatchState {
     motions: { player1: emptyMotion(), player2: emptyMotion() },
     arenaId: options.arenaId ?? 'mayan-temple',
     arena: options.arena ?? DEFAULT_ARENA,
+    callout: null,
+    calloutTime: 0,
   }
 }
 
@@ -116,6 +120,7 @@ function profileOf(fighter: FighterState): FighterProfile {
     maxLife: fighter.maxLife,
     speed: fighter.speed,
     damageScale: fighter.damageScale,
+    chips: fighter.chips,
     combos: fighter.combos,
   }
 }
@@ -146,6 +151,49 @@ export function resumeMatch(state: MatchState): MatchState {
   return { ...state, status: state.resumeStatus ?? 'running', resumeStatus: null }
 }
 
+function chipRatio(value: number | undefined): number {
+  if (value === undefined || Number.isNaN(value)) {
+    return BLOCK_CHIP
+  }
+  return Math.min(1, Math.max(0, value))
+}
+
+function chipDamage(raw: number, ratio: number): number {
+  if (ratio <= 0) {
+    return 0
+  }
+  return Math.max(1, Math.round(raw * ratio))
+}
+
+function blockStunFor(hitstun: number): number {
+  return Math.max(BLOCK_STUN_MIN, hitstun * BLOCK_STUN_SCALE)
+}
+
+function strikeChip(attacker: FighterState): number {
+  if (attacker.action === 'special') {
+    return chipRatio(attacker.special?.chip)
+  }
+  if (attacker.action === 'attackUp' || attacker.action === 'attackDown') {
+    return attacker.chips[attacker.action]
+  }
+  return BLOCK_CHIP
+}
+
+function fadeCallout(state: MatchState, dt: number): MatchState {
+  if (state.calloutTime <= 0) {
+    return state.callout ? { ...state, callout: null } : state
+  }
+  const calloutTime = Math.max(0, state.calloutTime - dt)
+  return { ...state, calloutTime, callout: calloutTime > 0 ? state.callout : null }
+}
+
+function noteBlock(state: MatchState, events: GameEvent[], dt: number): MatchState {
+  if (events.some((event) => event.type === 'hit' && event.blocked)) {
+    return { ...state, callout: 'BLOCK', calloutTime: 0.75 }
+  }
+  return fadeCallout(state, dt)
+}
+
 export function stepMatch(state: MatchState, intents: Record<FighterId, Intent>, dt: number): StepResult {
   if (dt <= 0 || state.status === 'menu' || state.status === 'paused' || state.status === 'matchEnd') {
     return { state, events: [] }
@@ -159,17 +207,17 @@ export function stepMatch(state: MatchState, intents: Record<FighterId, Intent>,
     const introTime = Math.max(0, state.introTime - dt)
     const stepped = integrate(state, EMPTY_INTENT, EMPTY_INTENT, dt, false)
     return {
-      state: {
+      state: fadeCallout({
         ...stepped.state,
         introTime,
         banner: introTime > 0 ? state.banner : null,
-      },
+      }, dt),
       events: [],
     }
   }
 
   const stepped = integrate(state, intents.player1, intents.player2, dt, true)
-  let next = stepped.state
+  let next = noteBlock(stepped.state, stepped.events, dt)
   const events = stepped.events
   next = { ...next, timeLeft: next.timeLeft - dt }
 
@@ -210,7 +258,7 @@ function stepRoundEnd(state: MatchState, dt: number): StepResult {
   const stepped = integrate(state, EMPTY_INTENT, EMPTY_INTENT, dt, false)
   const bannerTime = state.bannerTime + dt
   if (bannerTime < ROUND_END_DELAY) {
-    return { state: { ...stepped.state, status: 'roundEnd', bannerTime }, events: [] }
+    return { state: fadeCallout({ ...stepped.state, status: 'roundEnd', bannerTime }, dt), events: [] }
   }
 
   if (state.matchPending) {
@@ -247,6 +295,8 @@ function startRound(state: MatchState, round: number): MatchState {
     winner: null,
     projectiles: [],
     motions: { player1: emptyMotion(), player2: emptyMotion() },
+    callout: null,
+    calloutTime: 0,
     fighters: [
       resetFighter(state.fighters[0], state.arena.spawns[0], 1),
       resetFighter(state.fighters[1], state.arena.spawns[1], -1),
@@ -266,6 +316,7 @@ function resetFighter(fighter: FighterState, x: number, facing: 1 | -1): Fighter
     action: 'idle',
     actionTime: 0,
     blocking: false,
+    blockstun: 0,
     hitstun: 0,
     invuln: 0,
     attackResolved: false,
@@ -439,6 +490,7 @@ function shotFrom(before: FighterState, after: FighterState): ProjectileState | 
     hop: special.hop,
     w: special.hitW,
     h: special.hitH,
+    chip: chipRatio(special.chip),
   }
 }
 
@@ -492,14 +544,14 @@ function previewHit(attacker: FighterState, defender: FighterState): HitPreview 
   const facesAttacker = (defender.facing === 1 && attacker.x >= defender.x)
     || (defender.facing === -1 && attacker.x <= defender.x)
   const blocked = defender.blocking && facesAttacker && defender.y < 0.35
-  const damage = blocked ? Math.max(1, Math.round(rawDamage * BLOCK_CHIP)) : rawDamage
+  const damage = blocked ? chipDamage(rawDamage, strikeChip(attacker)) : rawDamage
   const dir = Math.sign(defender.x - attacker.x) || attacker.facing
 
   return {
     damage,
     blocked,
-    knockback: dir * (blocked ? spec.knockback * 0.25 : spec.knockback),
-    hitstun: blocked ? spec.hitstun * 0.45 : spec.hitstun,
+    knockback: dir * spec.knockback * (blocked ? BLOCK_PUSH : 1),
+    hitstun: blocked ? blockStunFor(spec.hitstun) : spec.hitstun,
     hop: blocked ? 0 : spec.hop,
     event: {
       type: 'hit',
@@ -514,12 +566,28 @@ function previewHit(attacker: FighterState, defender: FighterState): HitPreview 
 function receiveHit(defender: FighterState, hit: HitPreview): FighterState {
   const life = Math.max(0, defender.life - hit.damage)
   const ko = life <= 0
+  if (hit.blocked && !ko) {
+    return {
+      ...defender,
+      life,
+      ko: false,
+      action: 'block',
+      actionTime: 0,
+      blockstun: hit.hitstun,
+      hitstun: 0,
+      invuln: 0,
+      vx: hit.knockback,
+      vy: 0,
+      blocking: true,
+    }
+  }
   return {
     ...defender,
     life,
     ko,
     action: ko ? 'ko' : 'hitstun',
     actionTime: 0,
+    blockstun: 0,
     hitstun: ko ? 0 : hit.hitstun,
     invuln: hit.hitstun,
     vx: hit.knockback,
@@ -620,13 +688,13 @@ function stepProjectiles(
     const faces = (defender.facing === 1 && moved.x >= defender.x)
       || (defender.facing === -1 && moved.x <= defender.x)
     const blocked = defender.blocking && faces && defender.y < 0.35
-    const damage = blocked ? Math.max(1, Math.round(moved.damage * BLOCK_CHIP)) : moved.damage
+    const damage = blocked ? chipDamage(moved.damage, moved.chip) : moved.damage
     const dir = Math.sign(defender.x - moved.x) || attacker.facing
     const hit: HitPreview = {
       damage,
       blocked,
-      knockback: dir * (blocked ? moved.knockback * 0.25 : moved.knockback),
-      hitstun: blocked ? moved.hitstun * 0.45 : moved.hitstun,
+      knockback: dir * moved.knockback * (blocked ? BLOCK_PUSH : 1),
+      hitstun: blocked ? blockStunFor(moved.hitstun) : moved.hitstun,
       hop: blocked ? 0 : moved.hop,
       event: { type: 'hit', attacker: moved.owner, defender: defender.id, damage, blocked },
     }
@@ -656,7 +724,8 @@ function stepFighter(
 ): FighterState {
   const hitstun = Math.max(0, fighter.hitstun - dt)
   const invuln = Math.max(0, fighter.invuln - dt)
-  const base = { ...fighter, hitstun, invuln }
+  const blockstun = Math.max(0, fighter.blockstun - dt)
+  const base = { ...fighter, hitstun, invuln, blockstun }
 
   if (fighter.ko) {
     const vertical = integrateVertical(fighter.y, fighter.vy, dt)
@@ -684,6 +753,20 @@ function stepFighter(
       y: vertical.y,
       vy: vertical.vy,
       blocking: false,
+    }
+  }
+
+  if (fighter.blockstun > 0 && blockstun > 0) {
+    const vertical = integrateVertical(fighter.y, fighter.vy, dt)
+    return {
+      ...base,
+      action: 'block',
+      actionTime: fighter.actionTime + dt,
+      x: clampX(fighter.x + fighter.vx * dt, arena),
+      vx: decay(fighter.vx, dt),
+      y: vertical.y,
+      vy: vertical.vy,
+      blocking: true,
     }
   }
 
@@ -757,7 +840,7 @@ function stepFighter(
 }
 
 function faceOpponent(self: FighterState, other: FighterState): FighterState {
-  if (self.ko || self.hitstun > 0 || isAttack(self.action)) {
+  if (self.ko || self.hitstun > 0 || self.blockstun > 0 || self.blocking || isAttack(self.action)) {
     return self
   }
 

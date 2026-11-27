@@ -6,6 +6,7 @@ export interface HudFighterView {
   life: number
   health: number
   rounds: [boolean, boolean]
+  guard: string
 }
 
 export interface HudView {
@@ -13,6 +14,7 @@ export interface HudView {
   timer: string
   roundLabel: string
   banner: string | null
+  callout: string
   fighters: [HudFighterView, HudFighterView]
 }
 
@@ -35,12 +37,14 @@ export function hudView(state: DebugSnapshot, gamepadIndexes: [number, number]):
     timer: String(Math.max(0, Math.ceil(state.timeLeft))),
     roundLabel: `Round ${state.round}`,
     banner: showBanner ? state.banner : null,
+    callout: state.callout ?? '',
     fighters: state.fighters.map((fighter, index) => ({
       name: fighter.name,
       device: deviceLabel(fighter.device, gamepadIndexes[index]),
       life: fighter.life,
       health: fighter.maxLife <= 0 ? 0 : fighter.life / fighter.maxLife,
       rounds: [fighter.score >= 1, fighter.score >= 2] as [boolean, boolean],
+      guard: fighter.blocking ? 'BLOCK' : '',
     })) as [HudFighterView, HudFighterView],
   }
 }

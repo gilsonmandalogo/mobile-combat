@@ -344,6 +344,20 @@ canvas {
   font-size: 0.8rem;
 }
 
+.callout,
+.guard-tag {
+  color: #9fd0ff;
+  letter-spacing: 0.14em;
+  font-size: 0.78rem;
+  min-height: 1em;
+  text-shadow: 0 0 10px rgba(80, 140, 255, 0.75);
+}
+
+.callout {
+  text-align: center;
+  font-size: 0.95rem;
+}
+
 .pips {
   display: flex;
   gap: 0.3rem;

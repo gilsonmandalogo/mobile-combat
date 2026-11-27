@@ -17,8 +17,8 @@
     "license": "Existing project model shipped with Mobile Combat."
   },
   "moves": [
-    { "name": "Jab", "input": "Punch up", "damage": 9 },
-    { "name": "Sweep", "input": "Punch down", "damage": 14 }
+    { "name": "Jab", "input": "Punch up", "damage": 9, "chip": 0.1 },
+    { "name": "Sweep", "input": "Punch down", "damage": 14, "chip": 0.15 }
   ],
   "combos": [
     {
@@ -36,7 +36,8 @@
       "hitW": 0.42,
       "hitH": 0.42,
       "knockback": 5,
-      "hop": 0
+      "hop": 0,
+      "chip": 0.4
     }
   ]
 }

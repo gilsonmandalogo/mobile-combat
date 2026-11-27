@@ -18,6 +18,7 @@ function snapshot(partial: Partial<DebugSnapshot> = {}): DebugSnapshot {
     score: { player1: 1, player2: 0 },
     aiState: null,
     arenaId: 'mayan-temple',
+    callout: null,
     fighters: [
       { id: 'player1', name: 'Rio', life: 80, maxLife: 100, x: 0, y: 0, vx: 0, score: 1, action: 'idle', facing: 1, device: 'keyboard', blocking: false, ko: false, characterId: 'colin' },
       { id: 'player2', name: 'CPU', life: 100, maxLife: 100, x: 1, y: 0, vx: 0, score: 0, action: 'idle', facing: -1, device: 'ai', blocking: false, ko: false, characterId: 'maria' },
@@ -39,8 +40,17 @@ describe('hud', () => {
     expect(view.timer).toBe('60')
     expect(view.roundLabel).toBe('Round 1')
     expect(view.banner).toBeNull()
-    expect(view.fighters[0]).toMatchObject({ name: 'Rio', device: 'Keyboard', life: 80, health: 0.8, rounds: [true, false] })
+    expect(view.fighters[0]).toMatchObject({ name: 'Rio', device: 'Keyboard', life: 80, health: 0.8, rounds: [true, false], guard: '' })
     expect(view.fighters[1].device).toBe('AI')
+    const guarding = hudView(snapshot({
+      callout: 'BLOCK',
+      fighters: [
+        snapshot().fighters[0],
+        { ...snapshot().fighters[1], blocking: true },
+      ],
+    }), [0, 0])
+    expect(guarding.callout).toBe('BLOCK')
+    expect(guarding.fighters[1].guard).toBe('BLOCK')
 
     const ko = hudView(snapshot({ status: 'roundEnd', banner: 'K.O.' }), [0, 0])
     expect(ko.banner).toBe('K.O.')

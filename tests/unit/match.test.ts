@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { characterById } from '@src/content/catalog'
+import { attackChips, characterById } from '@src/content/catalog'
 import { ATTACKS, ROUND_END_DELAY } from '@src/sim/constants'
 import { createMatch, pauseMatch, quitToMenu, restartMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
 import { EMPTY_INTENT } from '@src/sim/types'
@@ -77,9 +77,82 @@ describe('match simulation', () => {
       ATTACKS.attackDown.startup + ATTACKS.attackDown.active,
     )
     const blocked = guarded.events.find((event) => event.type === 'hit')
-    expect(blocked).toMatchObject({ blocked: true })
+    expect(blocked).toMatchObject({ blocked: true, damage: 3 })
+    expect(guarded.state.fighters[1].life).toBe(97)
     expect(guarded.state.fighters[1].life).toBeGreaterThan(open.state.fighters[1].life)
-    expect(guarded.state.fighters[1].life).toBeLessThan(100)
+    expect(guarded.state.fighters[1].action).toBe('block')
+    expect(guarded.state.fighters[1].blockstun).toBeGreaterThan(0)
+    expect(guarded.state.fighters[1].x).toBeGreaterThan(0.95)
+    expect(guarded.state.callout).toBe('BLOCK')
+
+    const stuck = stepMatch(guarded.state, {
+      player1: { ...EMPTY_INTENT },
+      player2: { ...EMPTY_INTENT, attackUp: true },
+    }, 1 / 60)
+    expect(stuck.state.fighters[1].action).toBe('block')
+  })
+
+  it('refuses a block from behind or in the air, and uses each move chip', () => {
+    let behind = place(fight(), 0, 1)
+    behind = {
+      ...behind,
+      fighters: [
+        {
+          ...behind.fighters[0],
+          action: 'attackUp',
+          actionTime: ATTACKS.attackUp.startup,
+          attackResolved: false,
+        },
+        { ...behind.fighters[1], facing: 1, blocking: true, action: 'block' },
+      ],
+    }
+    const crossed = stepMatch(behind, {
+      player1: { ...EMPTY_INTENT },
+      player2: { ...EMPTY_INTENT, block: true },
+    }, 1 / 60)
+    const openHit = crossed.events.find((event) => event.type === 'hit')
+    expect(openHit).toMatchObject({ blocked: false, damage: ATTACKS.attackUp.damage })
+    expect(crossed.state.fighters[1].action).toBe('hitstun')
+
+    let air = place(fight(), 0, 0.95)
+    air = {
+      ...air,
+      fighters: [
+        {
+          ...air.fighters[0],
+          action: 'attackUp',
+          actionTime: ATTACKS.attackUp.startup,
+          attackResolved: false,
+        },
+        { ...air.fighters[1], y: 0.8, vy: 0, facing: -1, blocking: true, action: 'block' },
+      ],
+    }
+    const hopped = stepMatch(air, both(), 1 / 60)
+    expect(hopped.events.find((event) => event.type === 'hit')).toMatchObject({ blocked: false })
+
+    const custom = startMatch(createMatch({
+      mode: 'local',
+      difficulty: 'normal',
+      roundTime: 20,
+      names: ['Red', 'Blue'],
+      devices: ['keyboard', 'keyboard'],
+      seed: 1,
+      profiles: [
+        { chips: { attackUp: 0.5, attackDown: 0 } },
+        {},
+      ],
+    }))
+    const light = stepSeconds(place({ ...custom.state, introTime: 0, banner: null }, 0, 0.95), {
+      player1: { ...EMPTY_INTENT, attackUp: true },
+      player2: { ...EMPTY_INTENT, block: true },
+    }, ATTACKS.attackUp.startup + ATTACKS.attackUp.active)
+    expect(light.state.fighters[1].life).toBe(100 - 5)
+    const none = stepSeconds(place({ ...custom.state, introTime: 0, banner: null }, 0, 0.95), {
+      player1: { ...EMPTY_INTENT, attackDown: true },
+      player2: { ...EMPTY_INTENT, block: true },
+    }, ATTACKS.attackDown.startup + ATTACKS.attackDown.active)
+    expect(none.events.find((event) => event.type === 'hit')).toMatchObject({ blocked: true, damage: 0 })
+    expect(none.state.fighters[1].life).toBe(100)
   })
 
   it('lets a jump evade a low punch', () => {
@@ -258,8 +331,8 @@ function rosterFight(leftId: string, rightId: string): MatchState {
     devices: ['keyboard', 'keyboard'],
     seed: 1,
     profiles: [
-      { characterId: left.id, maxLife: left.stats.health, speed: left.stats.speed, damageScale: left.stats.damage, combos: left.combos },
-      { characterId: right.id, maxLife: right.stats.health, speed: right.stats.speed, damageScale: right.stats.damage, combos: right.combos },
+      { characterId: left.id, maxLife: left.stats.health, speed: left.stats.speed, damageScale: left.stats.damage, chips: attackChips(left.moves), combos: left.combos },
+      { characterId: right.id, maxLife: right.stats.health, speed: right.stats.speed, damageScale: right.stats.damage, chips: attackChips(right.moves), combos: right.combos },
     ],
   }))
   return { ...started.state, introTime: 0, banner: null }
@@ -281,6 +354,32 @@ describe('character specials', () => {
     const landed = tap(state, {}, 1)
     expect(landed.fighters[1].life).toBeLessThan(characterById('maria').stats.health)
     expect(landed.projectiles.length).toBe(0)
+
+    let guarded = place(rosterFight('colin', 'maria'), -1.5, 2.4)
+    const hold = {
+      player1: { ...EMPTY_INTENT },
+      player2: { ...EMPTY_INTENT, block: true },
+    }
+    guarded = stepSeconds(guarded, {
+      player1: { ...EMPTY_INTENT, move: -1 },
+      player2: hold.player2,
+    }, 0.08).state
+    guarded = stepSeconds(guarded, hold, 0.04).state
+    guarded = stepSeconds(guarded, {
+      player1: { ...EMPTY_INTENT, move: 1 },
+      player2: hold.player2,
+    }, 0.08).state
+    guarded = stepSeconds(guarded, hold, 0.04).state
+    guarded = stepSeconds(guarded, {
+      player1: { ...EMPTY_INTENT, attackUp: true },
+      player2: hold.player2,
+    }, 0.05).state
+    const chipped = stepSeconds(guarded, hold, 1)
+    const health = characterById('maria').stats.health
+    const blockedShot = chipped.events.find((event) => event.type === 'hit')
+    expect(blockedShot).toMatchObject({ blocked: true, damage: 6 })
+    expect(chipped.state.fighters[1].life).toBe(health - 6)
+    expect(chipped.state.fighters[1].action).not.toBe('hitstun')
   })
 
   it('dashes, uppercuts, and teleports from each character manifest', () => {

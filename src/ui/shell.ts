@@ -419,6 +419,7 @@ export class Shell {
     hud.hidden = !view.visible
     this.text('timer', view.timer)
     this.text('round-label', view.roundLabel)
+    this.text('combat-callout', view.callout)
     banner.hidden = view.banner === null || state.status === 'matchEnd'
     banner.textContent = view.banner ?? ''
     view.fighters.forEach((fighter, index) => {
@@ -426,6 +427,7 @@ export class Shell {
       this.text(`hud-name-${slot}`, fighter.name)
       this.text(`hud-device-${slot}`, fighter.device)
       this.text(`life-${slot}`, String(fighter.life))
+      this.text(`guard-${slot}`, fighter.guard)
       const bar = document.querySelector(`[data-testid="health-${slot}"]`)
       if (bar instanceof HTMLElement) {
         bar.style.transform = `scaleX(${fighter.health})`

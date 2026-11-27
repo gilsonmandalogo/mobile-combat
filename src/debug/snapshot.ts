@@ -33,6 +33,7 @@ export interface DebugSnapshot {
   fighters: [DebugFighter, DebugFighter]
   aiState: string | null
   arenaId: string
+  callout: string | null
 }
 
 export function snapshotMatch(state: MatchState, ready: boolean, aiState: string | null = null): DebugSnapshot {
@@ -69,5 +70,6 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     fighters,
     aiState,
     arenaId: state.arenaId,
+    callout: state.callout,
   }
 }
