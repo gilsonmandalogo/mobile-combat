@@ -1,12 +1,19 @@
 import { clampGain, cueTones, musicNote } from '@src/audio/cues'
 import type { CueName, Tone } from '@src/audio/cues'
 
+/** How long a cue stays silent so a discarded prediction can cancel it. */
+export const CUE_ARM_SECONDS = 0.05
+
+/** How quickly a cue that already started fades when a prediction is dropped. */
+export const CUE_RELEASE_SECONDS = 0.012
+
 export interface AudioSnapshot {
   lastCue: CueName | null
   unlocked: boolean
   music: boolean
   musicVolume: number
   sfxVolume: number
+  arm: number
 }
 
 interface ToneContext {
@@ -27,7 +34,7 @@ export class AudioEngine {
   private musicClock = 0
   private musicStep = 0
   private theme = 'temple'
-  private live: Array<{ stop: () => void }> = []
+  private sfx: Array<{ silence: () => void }> = []
 
   constructor(private readonly createContext: () => ToneContext | null = defaultContext) {}
 
@@ -58,19 +65,20 @@ export class AudioEngine {
 
   play(cue: CueName) {
     this.lastCue = cue
-    this.voice(cueTones(cue), this.sfxVolume)
+    this.voice(cueTones(cue), this.sfxVolume, true)
   }
 
-  /** Stops the cues that are still sounding. A discarded prediction uses this. */
+  /**
+   * Drops every effect that has not finished.
+   * A cue is scheduled a moment ahead at zero gain, so a cut during that
+   * window removes the ramp and the tone never becomes audible. A cue that
+   * has already started ramps to silence instead of ringing out.
+   */
   cut() {
-    for (const voice of this.live) {
-      try {
-        voice.stop()
-      } catch {
-        // already stopped
-      }
+    for (const voice of this.sfx) {
+      voice.silence()
     }
-    this.live = []
+    this.sfx = []
     this.lastCue = null
   }
 
@@ -82,7 +90,7 @@ export class AudioEngine {
     const spacing = 0.34
     while (this.musicClock >= spacing) {
       this.musicClock -= spacing
-      this.voice([musicNote(this.musicStep, this.theme)], this.musicVolume * 0.55)
+      this.voice([musicNote(this.musicStep, this.theme)], this.musicVolume * 0.55, false)
       this.musicStep += 1
     }
   }
@@ -94,28 +102,55 @@ export class AudioEngine {
       music: this.music,
       musicVolume: this.musicVolume,
       sfxVolume: this.sfxVolume,
+      arm: CUE_ARM_SECONDS,
     }
   }
 
-  private voice(tones: Tone[], volume: number) {
+  private voice(tones: Tone[], volume: number, cancelable: boolean) {
     const context = this.context
     if (!context || volume <= 0) {
       return
     }
-    let when = context.currentTime
+    const arm = cancelable ? CUE_ARM_SECONDS : 0
+    let when = context.currentTime + arm
     for (const tone of tones) {
       const osc = context.createOscillator()
       const gain = context.createGain()
+      const peak = Math.max(0.0002, tone.gain * volume)
+      const attack = Math.min(0.03, tone.duration * 0.45)
       osc.type = tone.type
       osc.frequency.setValueAtTime(tone.frequency, when)
       osc.frequency.exponentialRampToValueAtTime(Math.max(40, tone.slide), when + tone.duration)
-      gain.gain.setValueAtTime(tone.gain * volume, when)
+      gain.gain.setValueAtTime(0.0001, when)
+      gain.gain.exponentialRampToValueAtTime(peak, when + attack)
       gain.gain.exponentialRampToValueAtTime(0.0001, when + tone.duration)
       osc.connect(gain)
       gain.connect(context.destination)
       osc.start(when)
-      osc.stop(when + tone.duration + 0.02)
-      this.live.push(osc)
+      const end = when + tone.duration + 0.02
+      osc.stop(end)
+      if (cancelable) {
+        this.sfx.push({
+          silence: () => {
+            const now = context.currentTime
+            try {
+              gain.gain.cancelScheduledValues(now)
+              const level = Math.max(0.0001, gain.gain.value || 0.0001)
+              gain.gain.setValueAtTime(level, now)
+              gain.gain.exponentialRampToValueAtTime(0.0001, now + CUE_RELEASE_SECONDS)
+            } catch {
+              // the context is already closed
+            }
+            if (now < when) {
+              try {
+                osc.stop(now)
+              } catch {
+                // stop was already scheduled; the zero gain keeps it silent
+              }
+            }
+          },
+        })
+      }
       when += tone.duration * 0.72
     }
   }

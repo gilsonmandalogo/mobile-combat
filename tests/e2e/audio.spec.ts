@@ -21,6 +21,7 @@ test('hits play a cue and the volume sliders persist', async ({ page }) => {
   })
   const cue = await page.evaluate(() => window.__MOBILE_COMBAT__.getAudio())
   expect(cue.unlocked).toBe(true)
+  expect(cue.arm).toBeGreaterThan(0.03)
   expect(['attack', 'hit', 'block', 'ko']).toContain(cue.lastCue)
 
   await page.keyboard.press('Escape')

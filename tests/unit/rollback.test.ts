@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLobby, editLobby, lobbyMessage, mergeLobby, roomCode } from '@src/net/lobby'
+import { AudioEngine, CUE_ARM_SECONDS } from '@src/audio/engine'
 import { checksum, createRollback, INPUT_HISTORY, pushLocal, receiveSim, takeEffects } from '@src/net/rollback'
 import type { Rollback, SimMessage } from '@src/net/rollback'
 import { packSdp, unpackSdp } from '@src/net/transport'
@@ -186,6 +187,111 @@ describe('rollback netcode', () => {
     expect(hits).toHaveLength(1)
     expect(hits[0]).toMatchObject({ blocked: true, attacker: 'player1' })
     expect(takeEffects(left).some((event) => event.type === 'hit' || event.type === 'retract')).toBe(false)
+  })
+
+  it('silences a discarded hit before it starts and plays the correction once', () => {
+    const base = started()
+    const placed: MatchState = {
+      ...base,
+      fighters: [
+        { ...base.fighters[0], x: 0 },
+        { ...base.fighters[1], x: 0.85 },
+      ],
+    }
+    const left = createRollback(placed, 0, 4, 1)
+    const right = createRollback({
+      ...placed,
+      fighters: [
+        { ...placed.fighters[0] },
+        { ...placed.fighters[1] },
+      ],
+    }, 1, 4, 1)
+    const attack: Intent = { ...EMPTY_INTENT, attackDown: true }
+    const block: Intent = { ...EMPTY_INTENT, block: true }
+    const fromRight: SimMessage[] = []
+    for (let frame = 0; frame < 24; frame += 1) {
+      const mine = frame >= 2 ? attack : EMPTY_INTENT
+      for (const message of pushLocal(left, mine, frame)) {
+        if (message.kind !== 'inputs') {
+          receiveSim(right, message, frame)
+        }
+      }
+      for (const message of pushLocal(right, block, frame)) {
+        if (message.kind === 'inputs') {
+          fromRight.push(message)
+        } else {
+          receiveSim(left, message, frame)
+        }
+      }
+    }
+    const clock = { time: 2 }
+    const starts: number[] = []
+    const voices: Array<{ cancels: number; loud: boolean }> = []
+    const engine = new AudioEngine(() => ({
+      get currentTime() {
+        return clock.time
+      },
+      destination: {} as AudioNode,
+      state: 'running',
+      resume: () => Promise.resolve(),
+      createOscillator: () => ({
+        type: 'sine',
+        frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect() {},
+        start(time: number) { starts.push(time) },
+        stop() {},
+      }) as unknown as OscillatorNode,
+      createGain: () => {
+        const voice = { cancels: 0, loud: false }
+        voices.push(voice)
+        return {
+          gain: {
+            value: 0.0001,
+            setValueAtTime() {},
+            exponentialRampToValueAtTime(value: number) {
+              if (value > 0.05) {
+                voice.loud = true
+              }
+            },
+            cancelScheduledValues() {
+              voice.cancels += 1
+              voice.loud = false
+            },
+          },
+          connect() {},
+        } as unknown as GainNode
+      },
+    }))
+    engine.unlock()
+    const hear = (events: ReturnType<typeof takeEffects>) => {
+      for (const event of events) {
+        if (event.type === 'retract') {
+          engine.cut()
+        } else if (event.type === 'hit') {
+          engine.play(event.critical ? 'critical' : event.blocked ? 'block' : 'hit')
+        } else if (event.type === 'attack') {
+          engine.play(event.attack === 'super' ? 'super' : 'attack')
+        }
+      }
+    }
+    hear(takeEffects(left))
+    expect(engine.snapshot().lastCue).toBe('hit')
+    expect(starts.every((time) => time >= clock.time + CUE_ARM_SECONDS)).toBe(true)
+    const predictedVoices = voices.length
+    expect(predictedVoices).toBeGreaterThan(0)
+    expect(voices.some((voice) => voice.loud)).toBe(true)
+    for (const message of fromRight) {
+      receiveSim(left, message, 30)
+    }
+    hear(takeEffects(left))
+    expect(voices.slice(0, predictedVoices).every((voice) => voice.cancels === 1 && !voice.loud)).toBe(true)
+    expect(engine.snapshot().lastCue).toBe('block')
+    const corrected = voices.slice(predictedVoices)
+    expect(corrected.length).toBeGreaterThan(0)
+    expect(corrected.some((voice) => voice.loud && voice.cancels === 0)).toBe(true)
+    const scheduled = starts.length
+    hear(takeEffects(left))
+    expect(starts).toHaveLength(scheduled)
   })
 
   it('plays a predicted hit immediately and does not repeat it once confirmed', () => {
