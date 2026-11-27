@@ -6,7 +6,7 @@ A 3D fighting game built with [Astro](https://astro.build/) and [Three.js](https
 
 ### Tooling
 - Package manager is **Yarn (classic, v1)** — a `yarn.lock` is committed. Use `yarn`, not npm.
-- `.nvmrc` pins Node v19, but that version is not installed in this environment. Node v22 (the available version) installs, lints, builds, and runs the dev server without issues, so there is no need to install Node 19.
+- `.nvmrc` and `package.json` `engines` require Node 22. Node v22 is the version in this environment. Do not install Node 19.
 
 ### Commands (see `package.json` scripts)
 - Dev server: `yarn dev` — starts Astro on `http://localhost:3000`. Use `yarn dev --host 0.0.0.0` to expose it on the network. This is a static single-page app; there is no backend service.

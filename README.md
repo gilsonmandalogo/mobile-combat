@@ -128,6 +128,8 @@ Stages live in `src/content/arenas/<id>/manifest.json` and are discovered the sa
 
 ## Local development
 
+Node 22 or newer. `.nvmrc` pins 22.
+
 ```bash
 yarn install
 yarn dev

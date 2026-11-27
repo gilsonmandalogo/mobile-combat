@@ -4,6 +4,9 @@
   "repository": "git@github.com:gilsonmandalogo/mobile-combat.git",
   "author": "Gilson Júnior <gilsonmandalogo@hotmail.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
