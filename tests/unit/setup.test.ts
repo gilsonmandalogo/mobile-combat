@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deviceValue, parseDevice, readMatchSetup } from '@src/ui/setup'
+import { deviceValue, parseDevice, parseDifficulty, readMatchSetup } from '@src/ui/setup'
 
 describe('match setup', () => {
   it('reads mode, difficulty, names, and devices', () => {
@@ -22,7 +22,7 @@ describe('match setup', () => {
   it('falls back when the form values are unknown', () => {
     const setup = readMatchSetup({
       mode: 'online',
-      difficulty: 'nightmare',
+      difficulty: 'insane',
       name1: '   ',
       name2: 'A very long fighter name that will be cut',
       device1: 'dance-pad',
@@ -32,6 +32,8 @@ describe('match setup', () => {
     expect(setup.difficulty).toBe('normal')
     expect(setup.name1).toBe('Player 1')
     expect(setup.name2).toBe('A very long fighte')
+    expect(parseDifficulty('nightmare')).toBe('nightmare')
+    expect(parseDifficulty('insane')).toBe('normal')
     expect(parseDevice('nope', 1)).toEqual({ device: 'keyboard', gamepadIndex: 1 })
     expect(deviceValue({ device: 'gamepad', gamepadIndex: 1 })).toBe('pad-1')
   })

@@ -19,6 +19,7 @@ describe('settings', () => {
     expect(settings.players.player2.keys.left).toBe('ArrowLeft')
     expect(settings.players.player2.keys.jump).toBe(defaultSettings().players.player2.keys.jump)
     expect(settings.musicVolume).toBeGreaterThan(0)
+    expect(settings.difficulty).toBe('normal')
   })
 
   it('clamps volumes and keeps a gamepad assignment', () => {
@@ -35,6 +36,8 @@ describe('settings', () => {
     expect(settings.players.player1.device).toBe('gamepad')
     expect(settings.players.player1.gamepadIndex).toBe(1)
     expect(settings.players.player1.name).toBe('Ada')
+    expect(normalizeSettings({ difficulty: 'nightmare' }).difficulty).toBe('nightmare')
+    expect(normalizeSettings({ difficulty: 'unfair' }).difficulty).toBe('normal')
   })
 
   it('swaps a key or button that is already bound on the same player', () => {

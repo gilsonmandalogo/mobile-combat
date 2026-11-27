@@ -6,7 +6,7 @@ export type InputToken = 'back' | 'forward' | 'up' | 'punch' | 'kick'
 export type SpecialEffect = 'projectile' | 'dash' | 'uppercut' | 'teleport'
 export type DeviceKind = 'keyboard' | 'gamepad' | 'ai'
 export type MatchStatus = 'menu' | 'running' | 'paused' | 'roundEnd' | 'matchEnd'
-export type Difficulty = 'easy' | 'normal' | 'hard'
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'nightmare'
 export type MatchMode = 'local' | 'ai'
 export type AttackName = 'attackUp' | 'attackDown'
 

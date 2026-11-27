@@ -1,3 +1,4 @@
+import { profileFor } from '@src/ai/profiles'
 import { attackPhase } from '@src/sim/hitboxes'
 import { EMPTY_INTENT } from '@src/sim/types'
 import type { Difficulty, FighterState, Intent } from '@src/sim/types'
@@ -9,26 +10,6 @@ export interface AiMemory {
   cooldown: number
   react: number
   seed: number
-}
-
-interface Profile {
-  prefer: number
-  attack: number
-  threat: number
-  reaction: number
-  aggression: number
-  block: number
-  evade: number
-  retreatLife: number
-  heavy: number
-  attackCd: number
-  retry: number
-}
-
-const PROFILES: Record<Difficulty, Profile> = {
-  easy: { prefer: 2.5, attack: 1.25, threat: 1.7, reaction: 0.5, aggression: 0.35, block: 0.2, evade: 0.25, retreatLife: 40, heavy: 0.15, attackCd: 1.35, retry: 0.65 },
-  normal: { prefer: 1.55, attack: 1.2, threat: 1.85, reaction: 0.18, aggression: 0.7, block: 0.7, evade: 0.35, retreatLife: 24, heavy: 0.4, attackCd: 0.85, retry: 0.35 },
-  hard: { prefer: 1.15, attack: 1.25, threat: 2.1, reaction: 0.05, aggression: 0.92, block: 1, evade: 0.4, retreatLife: 12, heavy: 0.55, attackCd: 0.55, retry: 0.2 },
 }
 
 export function createAiMemory(seed: number): AiMemory {
@@ -53,7 +34,7 @@ export function stepAi(
   difficulty: Difficulty,
   dt: number,
 ): { memory: AiMemory; intent: Intent } {
-  const profile = PROFILES[difficulty]
+  const profile = profileFor(difficulty)
   let seed = memory.seed >>> 0
   const roll = () => {
     const next = nextRng(seed)

@@ -13,6 +13,7 @@ import { hitbox, hurtbox } from '@src/sim/hitboxes'
 import { createMatch, pauseMatch, quitToMenu as menuState, restartMatch, resumeMatch, startMatch, stepMatch } from '@src/sim/match'
 import type { Aabb, Difficulty, FighterId, FighterProfile, GameEvent, Intent, MatchMode, MatchState } from '@src/sim/types'
 import { KeyboardTracker, keyboardIntent } from '@src/input/keyboard'
+import { parseDifficulty } from '@src/ui/setup'
 import type { Shell } from '@src/ui/shell'
 import { gamepadIntent, mergeGamepads } from '@src/input/gamepad'
 import type { HapticGamepad, PadSnapshot } from '@src/input/gamepad'
@@ -78,8 +79,7 @@ export default class Game {
     this.ready = true
     const params = new URLSearchParams(window.location.search)
     if (params.get('autostart') === '1') {
-      const requested = params.get('difficulty')
-      const difficulty: Difficulty = requested === 'easy' || requested === 'hard' ? requested : 'normal'
+      const difficulty = parseDifficulty(params.get('difficulty'))
       const seed = Number(params.get('seed'))
       const characters = params.get('characters')?.split(',')
       const ids: [string, string] = characters && characters.length === 2
@@ -225,7 +225,7 @@ export default class Game {
     }
     return createMatch({
       mode: 'local',
-      difficulty: 'normal',
+      difficulty: settings.difficulty,
       roundTime: this.roundTime,
       names: [settings.players.player1.name, settings.players.player2.name],
       devices: [deviceFor('player1'), deviceFor('player2')],

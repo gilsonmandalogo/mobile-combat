@@ -3,7 +3,7 @@ import type { ActionName, PlayerSlot } from '@stores/settings'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 import { buttonName } from '@src/input/gamepad'
 import type { PadBindings } from '@src/input/gamepad'
-import { deviceValue, readMatchSetup } from '@src/ui/setup'
+import { deviceValue, parseDifficulty, readMatchSetup } from '@src/ui/setup'
 import { hudView } from '@src/ui/hud'
 import { defaultArena, defaultPicks, loadArenas, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import { focusItems, moveFocus, paintFocus } from '@src/ui/focus'
@@ -65,6 +65,13 @@ export class Shell {
     }
     mode.addEventListener('change', syncMode)
     syncMode()
+    this.required<HTMLSelectElement>('difficulty').addEventListener('change', () => {
+      const current = settingsStore.get()
+      settingsStore.set({
+        ...current,
+        difficulty: parseDifficulty(this.required<HTMLSelectElement>('difficulty').value),
+      })
+    })
 
     this.bindClick('resume', () => this.host.resume())
     this.bindClick('restart', () => this.host.restart())
@@ -814,6 +821,7 @@ export class Shell {
       : setup.device2
     settingsStore.set({
       ...current,
+      difficulty: setup.difficulty,
       players: {
         player1: { ...current.players.player1, name: setup.name1, ...setup.device1 },
         player2: { ...current.players.player2, name: setup.name2, ...secondDevice },
@@ -823,6 +831,7 @@ export class Shell {
 
   private fillFromSettings() {
     const settings = settingsStore.get()
+    this.setValue('difficulty', settings.difficulty)
     this.setValue('name1', settings.players.player1.name)
     this.setValue('name2', settings.players.player2.name)
     this.setValue('device1', deviceValue(settings.players.player1))

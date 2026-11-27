@@ -15,7 +15,11 @@ export interface MatchSetup {
   device2: DeviceChoiceValue
 }
 
-const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard']
+export const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard', 'nightmare']
+
+export function parseDifficulty(value: string | null | undefined): Difficulty {
+  return DIFFICULTIES.includes(value as Difficulty) ? value as Difficulty : 'normal'
+}
 
 export function parseDevice(value: string, fallbackIndex: number): DeviceChoiceValue {
   if (value === 'pad-0') {
@@ -43,9 +47,7 @@ export function readMatchSetup(input: {
   device2: string
 }): MatchSetup {
   const mode: MatchMode = input.mode === 'ai' ? 'ai' : 'local'
-  const difficulty = DIFFICULTIES.includes(input.difficulty as Difficulty)
-    ? input.difficulty as Difficulty
-    : 'normal'
+  const difficulty = parseDifficulty(input.difficulty)
   return {
     mode,
     difficulty,

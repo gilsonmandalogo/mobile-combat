@@ -1,6 +1,7 @@
 import { DEFAULT_PAD } from '@src/input/gamepad'
 import type { PadBindings } from '@src/input/gamepad'
 import type { KeyBindings } from '@src/input/keyboard'
+import type { Difficulty } from '@src/sim/types'
 
 export type { KeyBindings, PadBindings }
 
@@ -19,6 +20,7 @@ export interface Settings {
   musicVolume: number
   sfxVolume: number
   menuKey: string
+  difficulty: Difficulty
   players: {
     player1: PlayerSettings
     player2: PlayerSettings
@@ -36,6 +38,7 @@ export function defaultSettings(): Settings {
     musicVolume: 0.35,
     sfxVolume: 0.7,
     menuKey: 'Escape',
+    difficulty: 'normal',
     players: {
       player1: {
         name: 'Player 1',
@@ -82,6 +85,7 @@ export function normalizeSettings(raw: unknown): Settings {
       musicVolume: clampVolume(value.musicVolume, defaults.musicVolume),
       sfxVolume: clampVolume(value.sfxVolume, defaults.sfxVolume),
       menuKey: typeof value.menuKey === 'string' ? value.menuKey : defaults.menuKey,
+      difficulty: readDifficulty(value.difficulty),
       players: {
         player1: normalizePlayer(value.players.player1, defaults.players.player1),
         player2: normalizePlayer(value.players.player2, defaults.players.player2),
@@ -94,6 +98,7 @@ export function normalizeSettings(raw: unknown): Settings {
     return {
       ...defaults,
       debug: Boolean(value.debug),
+      difficulty: readDifficulty(value.difficulty),
       menuKey: typeof legacy.menu === 'string' ? legacy.menu : defaults.menuKey,
       players: {
         player1: {
@@ -108,7 +113,7 @@ export function normalizeSettings(raw: unknown): Settings {
     }
   }
 
-  return defaults
+  return { ...defaults, difficulty: readDifficulty(value.difficulty) }
 }
 
 export function rebindKey(settings: Settings, slot: PlayerSlot, action: ActionName, code: string): Settings {
@@ -196,6 +201,10 @@ function normalizePad(raw: unknown, fallback: PadBindings): PadBindings {
     }
   }
   return pad
+}
+
+function readDifficulty(value: unknown): Difficulty {
+  return value === 'easy' || value === 'normal' || value === 'hard' || value === 'nightmare' ? value : 'normal'
 }
 
 function clampVolume(value: unknown, fallback: number): number {
