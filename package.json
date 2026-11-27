@@ -16,7 +16,7 @@
     "lint:check": "eslint src --ext=.ts",
     "typecheck": "tsc --noEmit --pretty false",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "env -u NO_COLOR playwright test",
     "test": "yarn test:unit && yarn test:e2e"
   },
   "devDependencies": {
