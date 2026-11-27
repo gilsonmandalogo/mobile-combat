@@ -95,10 +95,17 @@ export function hitbox(fighter: FighterState): Aabb | null {
   }
 
   const centerX = fighter.x + fighter.facing * spec.reach
+  let minY = fighter.y + spec.hitY - spec.hitH / 2
+  const maxY = fighter.y + spec.hitY + spec.hitH / 2
+  if (fighter.action === 'jumpPunch' || fighter.action === 'jumpKick') {
+    // The fist stays in front of the body. The collision also reaches down
+    // through the jump, including the apex, onto a crouching opponent.
+    minY = Math.min(minY, CROUCH_HURT_HEIGHT * 0.5)
+  }
   return {
     minX: centerX - spec.hitW / 2,
     maxX: centerX + spec.hitW / 2,
-    minY: fighter.y + spec.hitY - spec.hitH / 2,
-    maxY: fighter.y + spec.hitY + spec.hitH / 2,
+    minY,
+    maxY,
   }
 }

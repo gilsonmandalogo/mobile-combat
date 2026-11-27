@@ -122,3 +122,47 @@ test('a forward jump lands on the far side and turns around', async ({ page }) =
   expect(landed.facing).toBe(-1)
   expect(['jumpLand', 'idle']).toContain(landed.pose)
 })
+
+test('a jump punch at the top of the arc hits a crouching opponent', async ({ page }) => {
+  await page.goto('/mobile-combat/?debug=1&autostart=1')
+  await page.waitForFunction(() => {
+    const api = (window as unknown as {
+      __MOBILE_COMBAT__?: { ready: boolean; getState: () => { introTime: number } }
+    }).__MOBILE_COMBAT__
+    return api?.ready === true && api.getState().introTime === 0
+  })
+
+  const result = await page.evaluate(() => {
+    const api = (window as unknown as {
+      __MOBILE_COMBAT__: {
+        setIntent: (id: string, intent: {
+          move: number
+          jump: boolean
+          attackUp: boolean
+          attackDown: boolean
+          block: boolean
+          crouch: boolean
+        }) => void
+        stepFor: (seconds: number) => void
+        getState: () => { fighters: Array<{ y: number; life: number; action: string }> }
+      }
+    }).__MOBILE_COMBAT__
+    const idle = { move: 0, jump: false, attackUp: false, attackDown: false, block: false, crouch: false }
+    api.setIntent('player1', { ...idle, move: 1 })
+    api.setIntent('player2', { ...idle, move: -1 })
+    api.stepFor(0.9)
+    api.setIntent('player1', { ...idle, jump: true })
+    api.setIntent('player2', { ...idle, crouch: true })
+    api.stepFor(1 / 60)
+    api.setIntent('player1', idle)
+    api.stepFor(0.4)
+    const airborne = api.getState().fighters[0].y
+    api.setIntent('player1', { ...idle, attackUp: true })
+    api.stepFor(0.2)
+    const after = api.getState()
+    return { airborne, life: after.fighters[1].life, action: after.fighters[0].action }
+  })
+
+  expect(result.airborne).toBeGreaterThan(0.8)
+  expect(result.life).toBeLessThan(100)
+})
