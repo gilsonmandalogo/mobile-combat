@@ -7,7 +7,7 @@ export type SpecialEffect = 'projectile' | 'dash' | 'uppercut' | 'teleport'
 export type DeviceKind = 'keyboard' | 'gamepad' | 'ai'
 export type MatchStatus = 'menu' | 'running' | 'paused' | 'roundEnd' | 'matchEnd'
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'nightmare'
-export type MatchMode = 'local' | 'ai'
+export type MatchMode = 'local' | 'ai' | 'online'
 export type AttackName = 'attackUp' | 'attackDown' | 'crouchPunch' | 'crouchKick'
 export type HitLevel = 'high' | 'mid' | 'low' | 'overhead'
 

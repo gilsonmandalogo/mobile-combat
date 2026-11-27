@@ -8,6 +8,7 @@ import { healthMotion, hudView } from '@src/ui/hud'
 import { defaultArena, defaultPicks, loadArenas, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import { focusItems, moveFocus, paintFocus } from '@src/ui/focus'
 import type { FocusDirection } from '@src/ui/focus'
+import type { OnlineView } from '@src/net/session'
 import type { Difficulty, MatchMode } from '@src/sim/types'
 import type { PadSnapshot } from '@src/input/gamepad'
 
@@ -36,13 +37,21 @@ export interface MatchHost {
   restart: () => void
   quitToMenu: () => void
   pads: () => PadSnapshot[]
+  hostOnline: () => void
+  joinOnline: (code: string) => void
+  editOnline: (patch: { character?: string; arena?: string; ready?: boolean; rematch?: boolean; delay?: number }) => void
+  leaveOnline: () => void
+  manualOffer: () => Promise<string>
+  manualAccept: (code: string) => Promise<string>
 }
 
 export class Shell {
   private ready = false
   private lastState: DebugSnapshot | null = null
   private listening: Listening | null = null
-  private screen: 'title' | 'main' | 'setup' | 'characters' | 'arenas' = 'title'
+  private screen: 'title' | 'main' | 'setup' | 'characters' | 'arenas' | 'online' = 'title'
+  private online: OnlineView | null = null
+  private onlineReady = false
   private hovered: EventTarget | null = null
   private titleHeld = false
   private focusId: string | null = null
@@ -79,7 +88,13 @@ export class Shell {
 
     this.bindClick('resume', () => this.host.resume())
     this.bindClick('restart', () => this.host.restart())
-    this.bindClick('results-rematch', () => this.host.restart())
+    this.bindClick('results-rematch', () => {
+      if (this.lastState?.mode === 'online') {
+        this.host.editOnline({ rematch: true })
+        return
+      }
+      this.host.restart()
+    })
     this.bindClick('results-menu', () => {
       this.screen = 'main'
       this.host.quitToMenu()
@@ -127,6 +142,8 @@ export class Shell {
       }
     })
     this.bindClick('main-fight', () => this.showScreen('setup'))
+    this.bindClick('main-online', () => this.showScreen('online'))
+    this.bindOnline()
     this.bindClick('setup-back', () => this.showScreen('main'))
     this.bindClick('characters-back', () => {
       this.screen = 'setup'
@@ -204,7 +221,7 @@ export class Shell {
     }
   }
 
-  private showScreen(screen: 'main' | 'setup' | 'characters' | 'arenas') {
+  private showScreen(screen: 'main' | 'setup' | 'characters' | 'arenas' | 'online') {
     this.screen = screen
     if (screen === 'characters') {
       this.renderRoster()
@@ -235,7 +252,9 @@ export class Shell {
           ? 'setup-menu'
           : this.screen === 'arenas'
             ? 'arena-select'
-            : ''
+            : this.screen === 'online'
+              ? 'online-menu'
+              : ''
     const element = id ? document.getElementById(id) : null
     return element && !element.hidden ? element : null
   }
@@ -401,7 +420,10 @@ export class Shell {
     this.setHidden('setup-menu', !(menu && this.screen === 'setup'))
     this.setHidden('character-select', !(menu && this.screen === 'characters'))
     this.setHidden('arena-select', !(menu && this.screen === 'arenas'))
+    this.setHidden('online-menu', !(menu && this.screen === 'online'))
+    this.setHidden('online-disconnect', !this.online?.disconnected)
     this.setHidden('results-panel', state.status !== 'matchEnd' || settingsOpen)
+    this.paintOnline()
     if (state.status === 'matchEnd') {
       this.text('results-title', state.banner ?? 'Match over')
     }
@@ -429,6 +451,7 @@ export class Shell {
     this.text('timer', view.timer)
     this.text('round-label', view.roundLabel)
     this.text('combat-callout', view.callout)
+    this.text('net-status', state.net ? `${state.net.link} ${state.net.ping} ms` : '')
     const bannerText = view.banner ?? ''
     const hideBanner = view.banner === null || state.status === 'matchEnd'
     if (banner.hidden !== hideBanner || banner.textContent !== bannerText) {
@@ -897,6 +920,118 @@ export class Shell {
     })
   }
 
+  private bindOnline() {
+    const character = this.required<HTMLSelectElement>('online-character')
+    const arena = this.required<HTMLSelectElement>('online-arena')
+    for (const fighter of this.roster) {
+      const option = document.createElement('option')
+      option.value = fighter.id
+      option.textContent = fighter.name
+      character.append(option)
+    }
+    for (const stage of this.arenas) {
+      const option = document.createElement('option')
+      option.value = stage.id
+      option.textContent = stage.name
+      arena.append(option)
+    }
+    character.addEventListener('change', () => this.host.editOnline({ character: character.value }))
+    arena.addEventListener('change', () => this.host.editOnline({ arena: arena.value }))
+    this.required<HTMLInputElement>('input-delay').addEventListener('change', () => {
+      const delay = Number(this.required<HTMLInputElement>('input-delay').value)
+      const current = settingsStore.get()
+      settingsStore.set({ ...current, inputDelay: delay })
+      this.host.editOnline({ delay })
+    })
+    this.bindClick('online-host', () => { void this.host.hostOnline() })
+    this.bindClick('online-join', () => {
+      void this.host.joinOnline(this.required<HTMLInputElement>('join-code').value)
+    })
+    this.bindClick('online-ready', () => {
+      this.onlineReady = !this.onlineReady
+      this.required<HTMLButtonElement>('online-ready').textContent = this.onlineReady ? 'Waiting' : 'Ready'
+      this.host.editOnline({ ready: this.onlineReady })
+    })
+    this.bindClick('online-copy', () => {
+      const link = this.online?.link
+      if (link && navigator.clipboard) {
+        void navigator.clipboard.writeText(link)
+      }
+    })
+    this.bindClick('manual-offer', () => {
+      void this.host.manualOffer().then((code) => {
+        this.required<HTMLTextAreaElement>('manual-code').value = code
+      }).catch(() => {
+        this.text('online-status', 'WebRTC is not available')
+      })
+    })
+    this.bindClick('manual-accept', () => {
+      const box = this.required<HTMLTextAreaElement>('manual-code')
+      void this.host.manualAccept(box.value).then((answer) => {
+        if (answer) {
+          box.value = answer
+        }
+      }).catch(() => {
+        this.text('online-status', 'That connection code could not be accepted')
+      })
+    })
+    this.bindClick('online-back', () => {
+      this.onlineReady = false
+      this.host.leaveOnline()
+      this.showScreen('main')
+    })
+    this.bindClick('online-leave', () => {
+      this.online = null
+      this.onlineReady = false
+      this.screen = 'main'
+      this.host.leaveOnline()
+      this.host.quitToMenu()
+    })
+  }
+
+  setOnline(view: OnlineView | null) {
+    this.online = view
+    if (view?.disconnected) {
+      if (this.lastState) {
+        this.render(this.lastState)
+      }
+      return
+    }
+    if (view && (!this.lastState || this.lastState.status === 'menu')) {
+      this.screen = 'online'
+    }
+    if (!view && this.screen === 'online') {
+      this.screen = 'main'
+    }
+    if (this.lastState) {
+      this.render(this.lastState)
+    }
+  }
+
+  private paintOnline() {
+    const view = this.online
+    if (!view) {
+      return
+    }
+    this.text('online-status', view.status)
+    this.text('room-code', view.code && view.code !== 'MANUAL' ? `Room ${view.code}` : '')
+    this.text('room-link', view.link)
+    const opponent = this.roster.find((fighter) => fighter.id === view.opponent)
+    const stage = this.arenas.find((arena) => arena.id === view.arena)
+    this.text('online-opponent', view.disconnected ? '' : `Opponent ${opponent?.name ?? view.opponent} · ${stage?.name ?? view.arena}`)
+    const character = document.getElementById('online-character')
+    if (character instanceof HTMLSelectElement && document.activeElement !== character) {
+      character.value = view.yours
+    }
+    const arena = document.getElementById('online-arena')
+    if (arena instanceof HTMLSelectElement) {
+      arena.disabled = view.role !== 'host'
+      if (document.activeElement !== arena) {
+        arena.value = view.arena
+      }
+    }
+  }
+
   private fillFromSettings() {
     const settings = settingsStore.get()
     this.setValue('difficulty', settings.difficulty)
@@ -904,6 +1039,12 @@ export class Shell {
     this.setValue('name2', settings.players.player2.name)
     this.setValue('device1', deviceValue(settings.players.player1))
     this.setValue('device2', deviceValue(settings.players.player2))
+    this.setValue('input-delay', String(settings.inputDelay))
+    const room = new URLSearchParams(location.search).get('room')
+    if (room) {
+      this.setValue('join-code', room.toUpperCase())
+      this.screen = 'online'
+    }
   }
 
   private refreshPads() {

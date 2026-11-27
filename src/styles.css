@@ -173,6 +173,7 @@ canvas {
 
 .panel input,
 .panel select,
+.panel textarea,
 .panel button {
   font: inherit;
   color: var(--ink);
@@ -180,6 +181,11 @@ canvas {
   border: 1px solid var(--gold-dim);
   border-radius: 2px;
   padding: 0.45rem 0.55rem;
+}
+
+.panel textarea {
+  min-height: 4.5rem;
+  resize: vertical;
 }
 
 .roster-panel {

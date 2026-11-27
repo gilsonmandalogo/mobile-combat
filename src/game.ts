@@ -20,6 +20,13 @@ import type { HapticGamepad, PadSnapshot } from '@src/input/gamepad'
 import { createAiMemory, stepAi } from '@src/ai/opponent'
 import type { AiMemory } from '@src/ai/opponent'
 import { EMPTY_INTENT } from '@src/sim/types'
+import { createLobby, roomCode } from '@src/net/lobby'
+import { FRAME_DT } from '@src/net/rollback'
+import { disconnectedView, NetPlay } from '@src/net/session'
+import { createLoopback, type Loopback, type NetEnvelope } from '@src/net/transport'
+import { createManualPeer } from '@src/net/manual'
+import type { ManualPeer } from '@src/net/manual'
+import { openTrystero } from '@src/net/trystero'
 import { AudioEngine } from '@src/audio/engine'
 import type { PlayerSlot } from '@src/settings/schema'
 
@@ -46,6 +53,11 @@ export default class Game {
   private ai: AiMemory | null = null
   private audio = new AudioEngine()
   private shell?: Shell
+  private netPlay: NetPlay | null = null
+  private loopback: Loopback | null = null
+  private manual: ManualPeer | null = null
+  private accumulator = 0
+  private netting = false
   private roundTime: number
   private hurtBoxes = [new THREE.Box3(), new THREE.Box3()]
   private hitBoxes = [new THREE.Box3(), new THREE.Box3()]
@@ -202,6 +214,15 @@ export default class Game {
     this.audio.setMusic(status !== 'menu')
     this.audio.update(dt)
     const simulate = status !== 'paused' && status !== 'menu' && status !== 'matchEnd'
+    if (this.netPlay?.rollback && simulate) {
+      this.stepOnline(dt)
+      return
+    }
+    if (this.netPlay && !this.netPlay.rollback) {
+      this.pollIntents(dt, false)
+      this.present(false, 0)
+      return
+    }
     const intents = this.pollIntents(dt, simulate)
     if (!simulate) {
       this.present(false, 0)
@@ -239,6 +260,8 @@ export default class Game {
     if (edges.has(settings.menuKey)) {
       if (this.shell?.settingsOpen()) {
         this.shell.showSettings(false)
+      } else if (this.netPlay && (this.match.status === 'running' || this.match.status === 'roundEnd')) {
+        this.leaveOnline()
       } else {
         this.togglePause()
       }
@@ -251,7 +274,11 @@ export default class Game {
     this.connectedPads = pads
     const startDown = pads.some((pad) => pad.buttons[9]?.pressed)
     if (startDown && !this.startWasDown) {
-      this.togglePause()
+      if (this.netPlay && (this.match.status === 'running' || this.match.status === 'roundEnd')) {
+        this.leaveOnline()
+      } else {
+        this.togglePause()
+      }
     }
     this.startWasDown = startDown
     const fromDevice = {
@@ -373,10 +400,168 @@ export default class Game {
     })
   }
 
+  public hostOnline() {
+    const code = roomCode((Math.floor(this.netClock()) ^ 0x9e3779b9) >>> 0)
+    void this.openRoom('host', code)
+  }
+
+  public joinOnline(code: string) {
+    const clean = code.trim().toUpperCase()
+    if (!clean) {
+      return
+    }
+    void this.openRoom('guest', clean)
+  }
+
+  public editOnline(patch: { character?: string; arena?: string; ready?: boolean; rematch?: boolean; delay?: number }) {
+    this.netPlay?.edit(patch)
+    void this.syncNet()
+  }
+
+  public leaveOnline() {
+    const fighting = this.match.status === 'running' || this.match.status === 'roundEnd'
+    this.netPlay?.leave()
+    this.netPlay = null
+    this.manual = null
+    this.accumulator = 0
+    if (fighting) {
+      this.match = pauseMatch(this.match)
+      this.shell?.setOnline(disconnectedView())
+      this.present(false, 0)
+      return
+    }
+    this.shell?.setOnline(null)
+  }
+
+  public async manualOffer(): Promise<string> {
+    this.leaveQuiet()
+    this.manual = createManualPeer()
+    const lobby = createLobby('host', 'MANUAL', settingsStore.get().inputDelay, 1, 'colin', 'mayan-temple')
+    this.netPlay = new NetPlay({ current: lobby }, this.manual, () => this.netClock())
+    const code = await this.manual.offer()
+    this.shell?.setOnline(this.netPlay.view(location.href))
+    return code
+  }
+
+  public async manualAccept(code: string): Promise<string> {
+    if (!code.trim()) {
+      return ''
+    }
+    if (!this.manual) {
+      this.leaveQuiet()
+      this.manual = createManualPeer()
+      const lobby = createLobby('guest', 'MANUAL', settingsStore.get().inputDelay, 1, 'colin', 'mayan-temple')
+      this.netPlay = new NetPlay({ current: lobby }, this.manual, () => this.netClock())
+      const answer = await this.manual.takeOffer(code.trim())
+      this.netPlay.sendLobby()
+      this.shell?.setOnline(this.netPlay.view(location.href))
+      return answer
+    }
+    await this.manual.takeAnswer(code.trim())
+    this.netPlay?.sendLobby()
+    void this.syncNet()
+    return ''
+  }
+
+  private async openRoom(role: 'host' | 'guest', code: string) {
+    this.leaveQuiet()
+    const settings = settingsStore.get()
+    const lobby = createLobby(role, code, settings.inputDelay, 1, 'colin', 'mayan-temple')
+    const transport = await this.openTransport(code, lobby)
+    this.netPlay = new NetPlay({ current: lobby }, transport, () => this.netClock())
+    this.netPlay.sendLobby()
+    this.shell?.setOnline(this.netPlay.view(location.href))
+  }
+
+  private async openTransport(code: string, lobby: ReturnType<typeof createLobby>) {
+    const params = new URLSearchParams(location.search)
+    if (params.get('net') === 'loopback') {
+      this.loopback = createLoopback()
+      return this.loopback.transport
+    }
+    return openTrystero(code, lobby)
+  }
+
+  private leaveQuiet() {
+    this.netPlay?.leave()
+    this.netPlay = null
+    this.loopback = null
+    this.manual = null
+  }
+
+  private async syncNet() {
+    const play = this.netPlay
+    if (!play || this.netting) {
+      return
+    }
+    if (play.current.phase === 'bye') {
+      this.leaveOnline()
+      return
+    }
+    if (play.current.phase === 'start' && (!play.rollback || play.rollback.seed !== play.current.seed)) {
+      this.netting = true
+      try {
+        await this.beginMatch({
+          mode: 'online',
+          difficulty: 'normal',
+          seed: play.current.seed,
+          characters: [play.current.characters[0], play.current.characters[1]],
+          arena: play.current.arena,
+        })
+        if (this.netPlay === play) {
+          play.begin(this.match)
+          this.accumulator = 0
+        }
+      } finally {
+        this.netting = false
+      }
+    }
+    if (this.netPlay === play) {
+      this.shell?.setOnline(play.view(location.href))
+    }
+  }
+
+  private stepOnline(dt: number) {
+    const play = this.netPlay
+    if (!play?.rollback) {
+      this.present(false, 0)
+      return
+    }
+    this.accumulator += dt
+    let guard = 0
+    while (this.accumulator >= FRAME_DT && guard < 4) {
+      const intents = this.pollIntents(FRAME_DT, true)
+      if (!this.netPlay?.rollback) {
+        return
+      }
+      const mine = play.rollback.side === 0 ? intents.player1 : intents.player2
+      const events = play.step(mine, this.netClock())
+      this.match = play.rollback.state
+      for (const event of events) {
+        this.onEvent(event)
+      }
+      this.accumulator -= FRAME_DT
+      guard += 1
+    }
+    this.flash.player1 = Math.max(0, this.flash.player1 - dt)
+    this.flash.player2 = Math.max(0, this.flash.player2 - dt)
+    this.present(true, dt)
+  }
+
+  private netClock(): number {
+    return typeof performance === 'undefined' ? 0 : performance.now()
+  }
+
   private present(animate: boolean, delta: number) {
     this.syncViews(animate, delta)
     this.publishDebug()
-    this.shell?.render(snapshotMatch(this.match, this.ready, this.ai?.state ?? null))
+    const snap = snapshotMatch(this.match, this.ready, this.ai?.state ?? null)
+    const rollback = this.netPlay?.rollback
+    snap.net = rollback ? {
+      ping: Math.round(rollback.ping),
+      link: rollback.desync ? 'Desync' : 'Live',
+    } : null
+    this.shell?.render(snap)
   }
 
   private publishDebug() {
@@ -408,6 +593,25 @@ export default class Game {
         }
       },
       getAudio: () => this.audio.snapshot(),
+      takeNet: () => this.loopback?.take() ?? [],
+      pushNet: (messages: NetEnvelope[]) => {
+        this.loopback?.push(messages)
+        void this.syncNet()
+      },
+      netInfo: () => ({
+        frame: this.netPlay?.rollback?.frame ?? 0,
+        confirmed: this.netPlay?.rollback?.confirmed ?? -1,
+        sum: this.netPlay?.rollback && this.netPlay.rollback.confirmed >= 0
+          ? this.netPlay.rollback.sums[this.netPlay.rollback.confirmed] ?? 0
+          : 0,
+        desync: Boolean(this.netPlay?.rollback?.desync),
+        phase: this.netPlay?.current.phase ?? 'offline',
+        characters: this.netPlay?.current.characters ?? ['', ''],
+        arena: this.netPlay?.current.arena ?? '',
+        peer: Boolean(this.netPlay?.current.peer),
+        seed: this.netPlay?.current.seed ?? 0,
+      }),
+      netSum: (frame: number) => this.netPlay?.rollback?.sums[frame] ?? 0,
       setVirtualGamepad: (pad: PadSnapshot | null) => {
         if (!pad) {
           this.virtualPads = []

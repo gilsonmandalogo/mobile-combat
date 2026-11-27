@@ -21,6 +21,7 @@ export interface Settings {
   sfxVolume: number
   menuKey: string
   difficulty: Difficulty
+  inputDelay: number
   players: {
     player1: PlayerSettings
     player2: PlayerSettings
@@ -39,6 +40,7 @@ export function defaultSettings(): Settings {
     sfxVolume: 0.7,
     menuKey: 'Escape',
     difficulty: 'normal',
+    inputDelay: 2,
     players: {
       player1: {
         name: 'Player 1',
@@ -88,6 +90,7 @@ export function normalizeSettings(raw: unknown): Settings {
       sfxVolume: clampVolume(value.sfxVolume, defaults.sfxVolume),
       menuKey: typeof value.menuKey === 'string' ? value.menuKey : defaults.menuKey,
       difficulty: readDifficulty(value.difficulty),
+      inputDelay: readDelay(value.inputDelay),
       players: {
         player1: normalizePlayer(value.players.player1, defaults.players.player1),
         player2: normalizePlayer(value.players.player2, defaults.players.player2),
@@ -115,7 +118,7 @@ export function normalizeSettings(raw: unknown): Settings {
     }
   }
 
-  return { ...defaults, difficulty: readDifficulty(value.difficulty) }
+  return { ...defaults, difficulty: readDifficulty(value.difficulty), inputDelay: readDelay(value.inputDelay) }
 }
 
 export function rebindKey(settings: Settings, slot: PlayerSlot, action: ActionName, code: string): Settings {
@@ -203,6 +206,14 @@ function normalizePad(raw: unknown, fallback: PadBindings): PadBindings {
     }
   }
   return pad
+}
+
+function readDelay(value: unknown): number {
+  const delay = typeof value === 'number' ? value : 2
+  if (!Number.isFinite(delay)) {
+    return 2
+  }
+  return Math.max(0, Math.min(8, Math.floor(delay)))
 }
 
 function readDifficulty(value: unknown): Difficulty {

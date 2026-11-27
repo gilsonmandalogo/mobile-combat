@@ -36,6 +36,7 @@ export interface DebugSnapshot {
   arenaId: string
   callout: string | null
   projectiles: number
+  net?: { ping: number; link: string } | null
 }
 
 export function snapshotMatch(state: MatchState, ready: boolean, aiState: string | null = null): DebugSnapshot {

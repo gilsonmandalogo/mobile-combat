@@ -24,7 +24,54 @@ import '@src/styles.css'
         <p class="tagline">Choose a fight or change the bindings.</p>
         <div class="menu-actions">
           <button id="main-fight" data-testid="main-fight" type="button">Fight</button>
+          <button id="main-online" data-testid="main-online" type="button">Online</button>
           <button id="open-settings" data-testid="open-settings" type="button">Settings</button>
+        </div>
+      </section>
+      <section id="online-menu" class="panel menu-panel" data-testid="online-menu" hidden>
+        <p class="eyebrow">Online</p>
+        <h2>No server</h2>
+        <p id="online-status" data-testid="online-status" class="tagline">Host a room or join with a code.</p>
+        <p id="room-code" data-testid="room-code" class="pick-name"></p>
+        <p id="room-link" data-testid="room-link" class="note"></p>
+        <p id="online-opponent" data-testid="online-opponent" class="note"></p>
+        <label>
+          Room code
+          <input id="join-code" data-testid="join-code" maxlength="6" autocomplete="off" />
+        </label>
+        <label>
+          Input delay
+          <input id="input-delay" data-testid="input-delay" type="number" min="0" max="8" step="1" value="2" />
+        </label>
+        <div class="player-grid">
+          <label>
+            Your fighter
+            <select id="online-character" data-testid="online-character"></select>
+          </label>
+          <label>
+            Arena
+            <select id="online-arena" data-testid="online-arena"></select>
+          </label>
+        </div>
+        <label>
+          Connection code
+          <textarea id="manual-code" data-testid="manual-code" rows="3" spellcheck="false"></textarea>
+        </label>
+        <div class="menu-actions">
+          <button id="online-host" data-testid="online-host" type="button">Host</button>
+          <button id="online-join" data-testid="online-join" type="button">Join</button>
+          <button id="online-ready" data-testid="online-ready" type="button">Ready</button>
+          <button id="manual-offer" data-testid="manual-offer" type="button">Create offer</button>
+          <button id="manual-accept" data-testid="manual-accept" type="button">Accept code</button>
+          <button id="online-copy" data-testid="online-copy" type="button">Copy room link</button>
+          <button id="online-back" data-testid="online-back" data-back type="button">Back</button>
+        </div>
+      </section>
+      <section id="online-disconnect" class="panel" data-testid="online-disconnect" hidden>
+        <h2>Opponent left</h2>
+        <p class="tagline">The room is closed.</p>
+        <div class="menu-actions">
+          <button id="online-leave" data-testid="online-leave" type="button">Leave</button>
         </div>
       </section>
       <section id="setup-menu" class="panel menu-panel" data-testid="setup-menu" hidden>
@@ -149,6 +196,7 @@ import '@src/styles.css'
           <div data-testid="timer" class="timer">60</div>
           <div data-testid="round-label" class="round-label">Round 1</div>
           <div data-testid="combat-callout" class="callout"></div>
+          <div data-testid="net-status" class="round-label"></div>
         </div>
         <div class="hud-side right">
           <div class="hud-meta">
