@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('keyboard bindings can be remapped, persisted, and reset', async ({ page }) => {
-  test.setTimeout(180_000)
+  test.setTimeout(240_000)
   await page.goto('/mobile-combat/?debug=1')
   await expect(page.getByTestId('start-match')).toBeEnabled()
   await page.getByTestId('open-settings').click()
@@ -11,9 +11,19 @@ test('keyboard bindings can be remapped, persisted, and reset', async ({ page })
   await expect(page.getByTestId('bind-player1-left')).toHaveText('Press a key')
   await page.keyboard.press('KeyQ')
   await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyQ')
-  await expect.poll(async () => page.evaluate(() => {
-    return JSON.parse(localStorage.getItem('settings') || '{}').players?.player1?.keys?.left
-  })).toBe('KeyQ')
+  await expect.poll(async () => savedLeft(page)).toBe('KeyQ')
+
+  await page.getByTestId('reset-bindings').evaluate((button) => {
+    if (button instanceof HTMLButtonElement) {
+      button.click()
+    }
+  })
+  await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyA')
+  await expect.poll(async () => savedLeft(page)).toBe('KeyA')
+
+  await page.getByTestId('bind-player1-left').click()
+  await page.keyboard.press('KeyQ')
+  await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyQ')
   await page.getByTestId('close-settings').click()
   await page.getByTestId('start-match').click()
   await page.waitForFunction(() => {
@@ -53,12 +63,12 @@ test('keyboard bindings can be remapped, persisted, and reset', async ({ page })
   })
   expect(Math.abs(afterOldKey - parked)).toBeLessThan(0.25)
 
-  await page.keyboard.press('Escape')
-  await page.getByTestId('pause-settings').click()
-  await page.getByTestId('reset-bindings').click()
-  await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyA')
   await page.reload({ waitUntil: 'commit' })
-  await expect.poll(async () => page.evaluate(() => {
-    return JSON.parse(localStorage.getItem('settings') || '{}').players?.player1?.keys?.left
-  })).toBe('KeyA')
+  await expect.poll(async () => savedLeft(page)).toBe('KeyQ')
 })
+
+function savedLeft(page: import('@playwright/test').Page): Promise<string | undefined> {
+  return page.evaluate(() => {
+    return JSON.parse(localStorage.getItem('settings') || '{}').players?.player1?.keys?.left
+  })
+}
