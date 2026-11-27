@@ -73,12 +73,12 @@ export default class Player {
     this.actor.rotation.y = state.facing === 1 ? Math.PI / 2 : -Math.PI / 2
     const fall = state.action === 'ko' ? Math.min(1, state.actionTime / 0.45) : 0
     let lean = -state.facing * fall * (Math.PI / 2.4)
+    this.actor.rotation.x = 0
+    this.actor.scale.y = this.actor.scale.x
     const crouching = state.crouching || state.action === 'crouch' || state.action === 'crouchPunch' || state.action === 'crouchKick'
     if (crouching) {
-      this.actor.position.y -= 0.46
-      this.actor.rotation.x = 0.65
-    } else {
-      this.actor.rotation.x = 0
+      this.actor.scale.y = this.actor.scale.x * 0.62
+      lean += -state.facing * 0.55
     }
     const guarding = state.action === 'block' || state.blocking
     if (guarding) {
