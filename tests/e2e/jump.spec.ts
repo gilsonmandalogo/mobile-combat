@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('a forward jump crosses up and one air punch connects', async ({ page }) => {
+test('a forward jump punches once in the air and lands', async ({ page }) => {
   await page.goto('/mobile-combat/?debug=1&autostart=1')
   await page.waitForFunction(() => {
     const api = (window as unknown as {
@@ -66,4 +66,59 @@ test('a forward jump crosses up and one air punch connects', async ({ page }) =>
   expect(result.swinging.pose).toBe('jumpAttack')
   expect(result.landed.y).toBe(0)
   expect(result.landed.life).toBeLessThan(100)
+})
+
+test('a forward jump lands on the far side and turns around', async ({ page }) => {
+  await page.goto('/mobile-combat/?debug=1&autostart=1')
+  await page.waitForFunction(() => {
+    const api = (window as unknown as {
+      __MOBILE_COMBAT__?: { ready: boolean; getState: () => { introTime: number } }
+    }).__MOBILE_COMBAT__
+    return api?.ready === true && api.getState().introTime === 0
+  })
+
+  const landed = await page.evaluate(() => {
+    const api = (window as unknown as {
+      __MOBILE_COMBAT__: {
+        setIntent: (id: string, intent: {
+          move: number
+          jump: boolean
+          attackUp: boolean
+          attackDown: boolean
+          block: boolean
+          crouch: boolean
+        }) => void
+        stepFor: (seconds: number) => void
+        getState: () => {
+          fighters: Array<{ x: number; y: number; facing: number; action: string; pose: string }>
+        }
+      }
+    }).__MOBILE_COMBAT__
+    const idle = { move: 0, jump: false, attackUp: false, attackDown: false, block: false, crouch: false }
+    api.setIntent('player1', { ...idle, move: 1 })
+    api.setIntent('player2', { ...idle, move: -1 })
+    api.stepFor(0.9)
+    const before = api.getState().fighters
+    api.setIntent('player1', { ...idle, jump: true, move: 1 })
+    api.setIntent('player2', idle)
+    api.stepFor(1 / 60)
+    api.setIntent('player1', idle)
+    api.stepFor(1.25)
+    const after = api.getState().fighters[0]
+    return {
+      beforeX: before[0].x,
+      otherX: before[1].x,
+      y: after.y,
+      x: after.x,
+      facing: after.facing,
+      pose: after.pose,
+      action: after.action,
+    }
+  })
+
+  expect(landed.beforeX).toBeLessThan(landed.otherX)
+  expect(landed.y).toBe(0)
+  expect(landed.x).toBeGreaterThan(landed.otherX)
+  expect(landed.facing).toBe(-1)
+  expect(['jumpLand', 'idle']).toContain(landed.pose)
 })
