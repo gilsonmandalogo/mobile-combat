@@ -48,5 +48,6 @@ test('the hud shows health, the clock, devices, and a KO banner', async ({ page 
 
   await expect(page.getByTestId('life-player2')).toHaveText(String(afterHit.fighters[1].life))
   expect(afterHit.fighters[1].life).toBeLessThan(100)
-  await expect(page.getByTestId('banner')).toHaveText('K.O.')
+  expect(afterHit.banner).toBe('Flawless victory')
+  await expect(page.getByTestId('banner')).toHaveText('Flawless victory')
 })
