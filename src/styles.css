@@ -260,13 +260,14 @@ canvas {
 
 .settings-panel {
   width: min(680px, calc(100vw - 1.5rem));
-  max-height: min(86vh, 760px);
+  height: min(86vh, 760px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .settings-scroll {
+  flex: 1;
   overflow: auto;
   min-height: 0;
 }
