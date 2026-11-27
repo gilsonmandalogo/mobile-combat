@@ -1,4 +1,5 @@
 import { AIR_HURT_HALF_W, AIR_HURT_HEIGHT, BLOCK_CHIP, BLOCK_PUSH, BLOCK_STUN_MIN, BLOCK_STUN_SCALE, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_CARRY, JUMP_SPEED, KNOCKBACK_DECAY, KNOCKDOWN_TIME, LAND_TIME, MAX_LIFE, MOVE_SPEED, PREJUMP_TIME, PUSH_DISTANCE, ROUND_END_DELAY, attackDuration, defaultAttackBook } from '@src/sim/constants'
+import { nextRng } from '@src/ai/opponent'
 import { COMBAT } from '@src/sim/rules'
 import type { ArenaBounds } from '@src/sim/constants'
 import { bestCombo, emptyMotion, holdsJump, pushMotion } from '@src/sim/buffer'
@@ -87,6 +88,9 @@ export function createMatch(options: MatchOptions): MatchState {
     banner: null,
     bannerTime: 0,
     seed: options.seed,
+    rng: options.seed >>> 0,
+    hitStop: 0,
+    critChance: options.critChance ?? COMBAT.critChance,
     projectiles: [],
     motions: { player1: emptyMotion(), player2: emptyMotion() },
     arenaId: options.arenaId ?? 'mayan-temple',
@@ -106,6 +110,7 @@ export function restartMatch(state: MatchState): MatchState {
     names: [state.fighters[0].name, state.fighters[1].name],
     devices: [state.fighters[0].device, state.fighters[1].device],
     seed: state.seed,
+    critChance: state.critChance,
     profiles: [profileOf(state.fighters[0]), profileOf(state.fighters[1])],
     arenaId: state.arenaId,
     arena: state.arena,
@@ -122,6 +127,7 @@ export function quitToMenu(state: MatchState): MatchState {
     names: [state.fighters[0].name, state.fighters[1].name],
     devices: [state.fighters[0].device, state.fighters[1].device],
     seed: state.seed,
+    critChance: state.critChance,
     profiles: [profileOf(state.fighters[0]), profileOf(state.fighters[1])],
     arenaId: state.arenaId,
     arena: state.arena,
@@ -205,6 +211,9 @@ function fadeCallout(state: MatchState, dt: number): MatchState {
 }
 
 function noteBlock(state: MatchState, events: GameEvent[], dt: number): MatchState {
+  if (events.some((event) => event.type === 'hit' && event.critical)) {
+    return { ...state, callout: 'CRITICAL!', calloutTime: 0.95 }
+  }
   if (events.some((event) => event.type === 'hit' && event.blocked)) {
     return { ...state, callout: 'BLOCK', calloutTime: 0.75 }
   }
@@ -218,6 +227,13 @@ export function stepMatch(state: MatchState, intents: Record<FighterId, Intent>,
 
   if (state.status === 'roundEnd') {
     return stepRoundEnd(state, dt)
+  }
+
+  if (state.hitStop > 0 && state.introTime <= 0) {
+    return {
+      state: fadeCallout({ ...state, hitStop: Math.max(0, state.hitStop - dt) }, dt),
+      events: [],
+    }
   }
 
   if (state.introTime > 0) {
@@ -319,6 +335,7 @@ function startRound(state: MatchState, round: number): MatchState {
     motions: { player1: emptyMotion(), player2: emptyMotion() },
     callout: null,
     calloutTime: 0,
+    hitStop: 0,
     fighters: [
       resetFighter(state.fighters[0], state.arena.spawns[0], 1),
       resetFighter(state.fighters[1], state.arena.spawns[1], -1),
@@ -468,20 +485,26 @@ function integrate(
   first = separated[0]
   second = separated[1]
 
+  let rng = state.rng
+  let hitStop = 0
   if (resolveHits) {
-    const resolved = resolveBoth(first, second)
+    const resolved = resolveBoth(first, second, rng, state.critChance)
     first = resolved.first
     second = resolved.second
+    rng = resolved.rng
+    hitStop = resolved.hitStop
     events.push(...resolved.events)
-    const shots = stepProjectiles(projectiles, first, second, dt, state.arena)
+    const shots = stepProjectiles(projectiles, first, second, dt, state.arena, rng, state.critChance)
     first = shots.first
     second = shots.second
     projectiles = shots.projectiles
+    rng = shots.rng
+    hitStop = Math.max(hitStop, shots.hitStop)
     events.push(...shots.events)
   }
 
   return {
-    state: { ...state, fighters: [first, second], motions, projectiles },
+    state: { ...state, fighters: [first, second], motions, projectiles, rng, hitStop: Math.max(state.hitStop, hitStop) },
     events,
   }
 }
@@ -531,6 +554,25 @@ function shotFrom(before: FighterState, after: FighterState): ProjectileState | 
   }
 }
 
+function amplifyHit(hit: HitPreview, rng: number, chance: number): { hit: HitPreview; rng: number } {
+  if (hit.blocked || chance <= 0) {
+    return { hit, rng }
+  }
+  const rolled = nextRng(rng)
+  if (rolled.value >= chance) {
+    return { hit, rng: rolled.seed }
+  }
+  const damage = Math.max(1, Math.round(hit.damage * COMBAT.critDamage))
+  return {
+    rng: rolled.seed,
+    hit: {
+      ...hit,
+      damage,
+      event: { ...hit.event, damage, critical: true },
+    },
+  }
+}
+
 function grantEnergy(fighter: FighterState, amount: number): FighterState {
   if (amount <= 0) {
     return fighter
@@ -538,8 +580,8 @@ function grantEnergy(fighter: FighterState, amount: number): FighterState {
   return { ...fighter, energy: Math.min(COMBAT.energyMax, fighter.energy + amount) }
 }
 
-function payMeter(attacker: FighterState, defender: FighterState, damage: number, blocked: boolean): { attacker: FighterState; defender: FighterState } {
-  const dealt = damage * (blocked ? COMBAT.energyOnBlock : COMBAT.energyOnDeal)
+function payMeter(attacker: FighterState, defender: FighterState, damage: number, blocked: boolean, critical = false): { attacker: FighterState; defender: FighterState } {
+  const dealt = damage * (blocked ? COMBAT.energyOnBlock : COMBAT.energyOnDeal * (critical ? COMBAT.critEnergyScale : 1))
   const taken = damage * (blocked ? COMBAT.energyOnBlock : COMBAT.energyOnTake)
   return {
     attacker: grantEnergy(attacker, dealt),
@@ -547,38 +589,56 @@ function payMeter(attacker: FighterState, defender: FighterState, damage: number
   }
 }
 
-function resolveBoth(first: FighterState, second: FighterState): { first: FighterState; second: FighterState; events: GameEvent[] } {
+function resolveBoth(
+  first: FighterState,
+  second: FighterState,
+  rng: number,
+  critChance: number,
+): { first: FighterState; second: FighterState; events: GameEvent[]; rng: number; hitStop: number } {
   const events: GameEvent[] = []
   const toSecond = previewHit(first, second)
   const toFirst = previewHit(second, first)
   let nextFirst = first
   let nextSecond = second
+  let hitStop = 0
+  const stopFor = (hit: HitPreview) => {
+    if (hit.blocked) {
+      return 0
+    }
+    return hit.event.critical ? COMBAT.critHitStop : COMBAT.hitStop
+  }
 
   if (toSecond) {
+    const amplified = amplifyHit(toSecond, rng, critChance)
+    rng = amplified.rng
     nextFirst = { ...nextFirst, attackResolved: true }
-    nextSecond = receiveHit(nextSecond, toSecond)
-    const paid = payMeter(nextFirst, nextSecond, toSecond.damage, toSecond.blocked)
+    nextSecond = receiveHit(nextSecond, amplified.hit)
+    const paid = payMeter(nextFirst, nextSecond, amplified.hit.damage, amplified.hit.blocked, amplified.hit.event.critical)
     nextFirst = paid.attacker
     nextSecond = paid.defender
-    events.push(toSecond.event)
+    events.push(amplified.hit.event)
+    hitStop = Math.max(hitStop, stopFor(amplified.hit))
     if (nextSecond.ko) {
       events.push({ type: 'ko', fighter: nextSecond.id })
     }
   }
 
   if (toFirst) {
+    const amplified = amplifyHit(toFirst, rng, critChance)
+    rng = amplified.rng
     nextSecond = { ...nextSecond, attackResolved: true }
-    nextFirst = receiveHit(nextFirst, toFirst)
-    const paid = payMeter(nextSecond, nextFirst, toFirst.damage, toFirst.blocked)
+    nextFirst = receiveHit(nextFirst, amplified.hit)
+    const paid = payMeter(nextSecond, nextFirst, amplified.hit.damage, amplified.hit.blocked, amplified.hit.event.critical)
     nextSecond = paid.attacker
     nextFirst = paid.defender
-    events.push(toFirst.event)
+    events.push(amplified.hit.event)
+    hitStop = Math.max(hitStop, stopFor(amplified.hit))
     if (nextFirst.ko) {
       events.push({ type: 'ko', fighter: nextFirst.id })
     }
   }
 
-  return { first: nextFirst, second: nextSecond, events }
+  return { first: nextFirst, second: nextSecond, events, rng, hitStop }
 }
 
 function previewHit(attacker: FighterState, defender: FighterState): HitPreview | null {
@@ -759,10 +819,13 @@ function stepProjectiles(
   second: FighterState,
   dt: number,
   arena: ArenaBounds,
-): { projectiles: ProjectileState[]; first: FighterState; second: FighterState; events: GameEvent[] } {
+  rng: number,
+  critChance: number,
+): { projectiles: ProjectileState[]; first: FighterState; second: FighterState; events: GameEvent[]; rng: number; hitStop: number } {
   const events: GameEvent[] = []
   let left = first
   let right = second
+  let hitStop = 0
   const next = projectiles.flatMap((shot) => {
     const moved: ProjectileState = { ...shot, x: shot.x + shot.vx * dt, ttl: shot.ttl - dt }
     if (moved.ttl <= 0 || Math.abs(moved.x) > arena.maxX + 2) {
@@ -790,8 +853,13 @@ function stepProjectiles(
       hop: blocked ? 0 : moved.hop,
       event: { type: 'hit', attacker: moved.owner, defender: defender.id, damage, blocked },
     }
-    const hurt = receiveHit(defender, hit)
-    const paid = payMeter(attacker, hurt, damage, blocked)
+    const amplified = amplifyHit(hit, rng, critChance)
+    rng = amplified.rng
+    const hurt = receiveHit(defender, amplified.hit)
+    const paid = payMeter(attacker, hurt, amplified.hit.damage, blocked, amplified.hit.event.critical)
+    if (!blocked) {
+      hitStop = Math.max(hitStop, amplified.hit.event.critical ? COMBAT.critHitStop : COMBAT.hitStop)
+    }
     if (moved.owner === 'player1') {
       left = paid.attacker
       right = paid.defender
@@ -799,13 +867,13 @@ function stepProjectiles(
       right = paid.attacker
       left = paid.defender
     }
-    events.push(hit.event)
+    events.push(amplified.hit.event)
     if (hurt.ko) {
       events.push({ type: 'ko', fighter: hurt.id })
     }
     return []
   })
-  return { projectiles: next, first: left, second: right, events }
+  return { projectiles: next, first: left, second: right, events, rng, hitStop }
 }
 
 function stepFighter(

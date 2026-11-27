@@ -256,7 +256,8 @@ export default class Game {
 
   private pollIntents(dt: number, simulate: boolean): Record<FighterId, Intent> {
     const settings = settingsStore.get()
-    const edges = this.keyboard.consumeEdges()
+    const frozen = this.match.hitStop > 0
+    const edges = frozen ? new Set<string>() : this.keyboard.consumeEdges()
     if (edges.has(settings.menuKey)) {
       if (this.shell?.settingsOpen()) {
         this.shell.showSettings(false)
@@ -282,8 +283,8 @@ export default class Game {
     }
     this.startWasDown = startDown
     const fromDevice = {
-      player1: this.intentFor('player1', settings, edges, pads, dt, simulate),
-      player2: this.intentFor('player2', settings, edges, pads, dt, simulate),
+      player1: this.intentFor('player1', settings, edges, pads, dt, simulate, frozen),
+      player2: this.intentFor('player2', settings, edges, pads, dt, simulate, frozen),
     }
 
     return {
@@ -299,6 +300,7 @@ export default class Game {
     pads: PadSnapshot[],
     dt: number,
     simulate: boolean,
+    frozen = false,
   ): Intent {
     const fighter = this.match.fighters.find((item) => item.id === slot)
     if (fighter?.device === 'ai') {
@@ -314,6 +316,9 @@ export default class Game {
     if (player.device === 'gamepad') {
       const pad = pads.find((item) => item.index === player.gamepadIndex) ?? null
       const result = gamepadIntent(pad, player.pad, this.padButtons[slot])
+      if (frozen) {
+        return { ...result.intent, jump: false, attackUp: false, attackDown: false }
+      }
       this.padButtons[slot] = result.pressed
       return result.intent
     }
@@ -357,10 +362,10 @@ export default class Game {
     if (event.type !== 'hit') {
       return
     }
-    this.audio.play(event.blocked ? 'block' : 'hit')
-    this.flash[event.defender] = 0.16
-    const strength = event.blocked ? 0.35 : 0.9
-    this.rumble(event.defender, strength, event.blocked ? 0.2 : 0.45, event.blocked ? 70 : 150)
+    this.audio.play(event.critical ? 'critical' : event.blocked ? 'block' : 'hit')
+    this.flash[event.defender] = event.critical ? 0.28 : 0.16
+    const strength = event.critical ? 1 : event.blocked ? 0.35 : 0.9
+    this.rumble(event.defender, strength, event.blocked ? 0.2 : 0.45, event.critical ? 220 : event.blocked ? 70 : 150)
     this.rumble(event.attacker, 0.25, 0.12, 60)
   }
 
@@ -619,6 +624,10 @@ export default class Game {
         seed: this.netPlay?.current.seed ?? 0,
       }),
       netSum: (frame: number) => this.netPlay?.rollback?.sums[frame] ?? 0,
+      setCritChance: (chance: number) => {
+        const critChance = Math.min(1, Math.max(0, chance))
+        this.match = { ...this.match, critChance }
+      },
       setVirtualGamepad: (pad: PadSnapshot | null) => {
         if (!pad) {
           this.virtualPads = []

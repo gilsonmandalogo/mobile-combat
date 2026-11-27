@@ -10,6 +10,7 @@ export interface DebugApi {
   stepFor: (seconds: number) => void
   getAudio: () => AudioSnapshot
   setVirtualGamepad: (pad: PadSnapshot | null) => void
+  setCritChance: (chance: number) => void
 }
 
 export function debugQueryEnabled(search: string): boolean {

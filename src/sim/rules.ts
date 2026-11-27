@@ -9,6 +9,11 @@ const rulesSchema = z.object({
   energyOnTake: z.number().nonnegative().max(5),
   energyOnBlock: z.number().nonnegative().max(5),
   energyCarry: z.boolean(),
+  critChance: z.number().min(0).max(1),
+  critDamage: z.number().min(1).max(4),
+  critEnergyScale: z.number().min(1).max(8),
+  hitStop: z.number().nonnegative().max(0.5),
+  critHitStop: z.number().nonnegative().max(0.5),
 }).refine((rules) => rules.maxRounds >= rules.roundsToWin, {
   message: 'maxRounds must be at least roundsToWin',
 })

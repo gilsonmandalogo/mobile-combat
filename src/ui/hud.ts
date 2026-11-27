@@ -43,6 +43,7 @@ export function healthMotion(previous: number, next: number): { snap: boolean; s
 }
 
 export function hudView(state: DebugSnapshot, gamepadIndexes: [number, number]): HudView {
+  const shout = state.callout === 'CRITICAL!' || state.callout === 'SUPER' ? state.callout : null
   const showBanner = Boolean(state.banner) && (
     state.introTime > 0 || state.status === 'roundEnd' || state.status === 'matchEnd'
   )
@@ -50,7 +51,7 @@ export function hudView(state: DebugSnapshot, gamepadIndexes: [number, number]):
     visible: state.status !== 'menu',
     timer: String(Math.max(0, Math.ceil(state.timeLeft))),
     roundLabel: `Round ${state.round}`,
-    banner: showBanner ? state.banner : null,
+    banner: showBanner ? state.banner : shout,
     callout: state.callout ?? '',
     fighters: state.fighters.map((fighter, index) => ({
       name: fighter.name,

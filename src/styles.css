@@ -498,6 +498,43 @@ canvas {
   animation: banner-ko 0.55s ease;
 }
 
+#banner.banner-crit {
+  color: #fff4d2;
+  animation: banner-ko 0.4s ease;
+}
+
+#overlay.is-shake {
+  animation: screen-shake 0.28s linear;
+}
+
+#sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.spark {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 50%;
+  background: #ffe7a3;
+  box-shadow: 0 0 12px #ffb03a;
+  animation: spark-out 0.45s ease-out forwards;
+}
+
+@keyframes screen-shake {
+  20% { transform: translateX(-8px); }
+  45% { transform: translateX(7px); }
+  70% { transform: translateX(-4px); }
+}
+
+@keyframes spark-out {
+  to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+}
+
 @keyframes banner-pop {
   0% { opacity: 0; transform: translate(-50%, -40%) scale(0.82); }
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }

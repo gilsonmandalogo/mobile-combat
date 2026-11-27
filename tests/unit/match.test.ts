@@ -451,6 +451,38 @@ describe('character specials', () => {
     expect(next.state.banner).toBe('Round 2')
   })
 
+  it('rolls a seeded critical, adds damage and meter, and hit-stops', () => {
+    let state = place(fight(), 0, 0.95)
+    state = { ...state, critChance: 1 }
+    let cursor = state
+    let event: ReturnType<typeof stepMatch>['events'][number] | undefined
+    let frozenX = 0
+    let stopped = false
+    for (let frame = 0; frame < 40 && !event; frame += 1) {
+      const step = stepMatch(cursor, both({ attackDown: true }), 1 / 60)
+      cursor = step.state
+      event = step.events.find((item) => item.type === 'hit')
+      if (event) {
+        expect(cursor.hitStop).toBeGreaterThan(0)
+        frozenX = cursor.fighters[0].x
+        const held = stepMatch(cursor, both({ move: 1 }), 1 / 60)
+        stopped = held.state.fighters[0].x === frozenX
+        cursor = held.state
+      }
+    }
+    expect(event).toMatchObject({ critical: true, attacker: 'player1' })
+    expect(cursor.fighters[1].life).toBeLessThan(100 - ATTACKS.attackDown.damage)
+    expect(stopped).toBe(true)
+    expect(cursor.rng).not.toBe(state.rng)
+    expect(cursor.callout).toBe('CRITICAL!')
+    const plain = stepSeconds({ ...place(fight(), 0, 0.95), critChance: 0 }, both({ attackDown: true }), 0.4)
+    expect(plain.events.some((item) => item.type === 'hit' && item.critical)).toBe(false)
+    const again = stepSeconds({ ...place(fight(), 0, 0.95), critChance: 1 }, both({ attackDown: true }), 0.5)
+    const first = stepSeconds({ ...place(fight(), 0, 0.95), critChance: 1 }, both({ attackDown: true }), 0.5)
+    expect(again.state.fighters[1].life).toBe(first.state.fighters[1].life)
+    expect(again.state.rng).toBe(first.state.rng)
+  })
+
   it('fills the meter from damage and keeps it into the next round', () => {
     let state = place(fight(), 0, 0.95)
     const hit = stepSeconds(state, both({ attackDown: true }), 0.4)

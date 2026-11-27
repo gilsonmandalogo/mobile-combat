@@ -87,6 +87,10 @@ export interface MatchState {
   banner: string | null
   bannerTime: number
   seed: number
+  /** Deterministic RNG cursor. Critical hits advance it. */
+  rng: number
+  hitStop: number
+  critChance: number
   projectiles: ProjectileState[]
   motions: Record<FighterId, MotionMemory>
   arenaId: string
@@ -120,6 +124,7 @@ export interface MatchOptions {
   names: [string, string]
   devices: [DeviceKind, DeviceKind]
   seed: number
+  critChance?: number
   profiles?: [FighterProfile, FighterProfile]
   arenaId?: string
   arena?: ArenaBounds

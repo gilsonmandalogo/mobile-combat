@@ -91,6 +91,8 @@ export function checksum(state: MatchState): number {
   add(state.status)
   add(state.round)
   add(state.roundsToWin)
+  add(state.rng)
+  add(quantize(state.hitStop))
   add(quantize(state.timeLeft))
   for (const fighter of state.fighters) {
     add(quantize(fighter.x))

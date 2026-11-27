@@ -457,10 +457,14 @@ export class Shell {
     if (banner.hidden !== hideBanner || banner.textContent !== bannerText) {
       banner.hidden = hideBanner
       banner.textContent = bannerText
-      banner.classList.remove('banner-pop', 'banner-ko')
+      banner.classList.remove('banner-pop', 'banner-ko', 'banner-crit')
       if (!hideBanner && bannerText && bannerText !== this.bannerText) {
         void banner.offsetWidth
-        banner.classList.add(bannerText === 'K.O.' ? 'banner-ko' : 'banner-pop')
+        const kind = bannerText === 'K.O.' ? 'banner-ko' : bannerText === 'CRITICAL!' ? 'banner-crit' : 'banner-pop'
+        banner.classList.add(kind)
+        if (bannerText === 'CRITICAL!') {
+          this.impact('critical')
+        }
       }
       this.bannerText = bannerText
     }
@@ -482,6 +486,31 @@ export class Shell {
         }
       }
     })
+  }
+
+  private impact(kind: 'critical' | 'super') {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const overlay = document.getElementById('overlay')
+    const sparks = document.getElementById('sparks')
+    if (!reduce && overlay) {
+      overlay.classList.remove('is-shake')
+      void overlay.offsetWidth
+      overlay.classList.add('is-shake')
+    }
+    if (!sparks || reduce || kind !== 'critical') {
+      return
+    }
+    sparks.replaceChildren()
+    const spots = [[46, 42], [54, 40], [42, 48], [58, 46], [50, 36], [48, 52], [60, 50], [40, 44]]
+    for (const [x, y] of spots) {
+      const spark = document.createElement('span')
+      spark.className = 'spark'
+      spark.style.left = `${x}%`
+      spark.style.top = `${y}%`
+      spark.style.setProperty('--dx', `${(x - 50) * 1.6}px`)
+      spark.style.setProperty('--dy', `${(y - 46) * 1.8}px`)
+      sparks.append(spark)
+    }
   }
 
   private paintMeter(slot: 'player1' | 'player2', ratio: number, full: boolean) {
