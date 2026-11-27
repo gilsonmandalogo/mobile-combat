@@ -16,7 +16,7 @@ A 3D fighting game built with [Astro](https://astro.build/) and [Three.js](https
 
 ### Running / testing the game (non-obvious)
 - The game is a 3D scene rendered to a `<canvas>`. Keyboard controls are bound to the canvas element, so you must **click the canvas first to give it focus** before key presses register.
-- Default Player 1 controls: `A`/`D` move, `Space` jump, `G` punch up, `V` punch down. Player 2 uses arrow keys, `Equal`/`BracketRight` to punch, etc. (defined in `src/stores/settings.ts`).
+- Default Player 1 controls: `A`/`D` move, `Space` jump, `G` punch up, `V` punch down, `U`+`I` super. Player 2 uses arrow keys, `Equal`/`BracketRight` to punch, `Digit9`+`Digit0` super. Gamepad super is LT+RT. Bindings are in `src/settings/schema.ts`.
 - The debug overlay (top-left text showing game status, player life, round timer, scores, plus collider wireframes) is **hidden by default**. There is no in-game UI to toggle it. To enable it for testing, set the persisted setting in the browser console and reload:
   ```js
   localStorage.setItem('settings', JSON.stringify({debug:true,inputs:{player1:{left:"KeyA",right:"KeyD",jump:"Space",attackUp:"KeyG",attackDown:"KeyV",block:"KeyY"},player2:{left:"ArrowLeft",right:"ArrowRight",jump:"ControlRight",attackUp:"Equal",attackDown:"BracketRight",block:"Backslash"},menu:"Escape"},inputType:"keyboard"}))
