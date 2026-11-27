@@ -43,6 +43,7 @@ export interface Rollback {
   lastCheck: number
   eventLog: GameEvent[][]
   played: Set<string>
+  emitted: Map<string, GameEvent>
   recentChecks: Array<{ frame: number; sum: number }>
   acked: Set<number>
 }
@@ -120,7 +121,10 @@ export function checksum(state: MatchState): number {
 
 export function effectKey(frame: number, event: GameEvent): string {
   if (event.type === 'hit') {
-    return `${frame}:hit:${event.attacker}:${event.defender}:${event.damage}:${event.blocked ? 1 : 0}`
+    return `${frame}:hit:${event.attacker}:${event.defender}:${event.damage}:${event.blocked ? 1 : 0}:${event.critical ? 1 : 0}`
+  }
+  if (event.type === 'retract') {
+    return `${frame}:retract:${event.of}`
   }
   if (event.type === 'attack') {
     return `${frame}:attack:${event.fighter}:${event.attack}`
@@ -139,21 +143,66 @@ export function effectKey(frame: number, event: GameEvent): string {
 
 export function takeEffects(session: Rollback): GameEvent[] {
   const cues: GameEvent[] = []
-  for (let frame = 0; frame <= session.confirmed; frame += 1) {
+  const live = new Set<string>()
+  for (let frame = 0; frame < session.frame; frame += 1) {
     const events = session.eventLog[frame]
     if (!events) {
       continue
     }
     for (const event of events) {
+      if (event.type === 'retract') {
+        continue
+      }
+      live.add(effectKey(frame, event))
+    }
+  }
+  for (const key of [...session.played]) {
+    if (live.has(key)) {
+      continue
+    }
+    const cause = session.emitted.get(key)
+    session.played.delete(key)
+    session.emitted.delete(key)
+    const retract = cause ? retractEvent(cause) : null
+    if (retract) {
+      cues.push(retract)
+    }
+  }
+  for (let frame = 0; frame < session.frame; frame += 1) {
+    const events = session.eventLog[frame]
+    if (!events) {
+      continue
+    }
+    for (const event of events) {
+      if (event.type === 'retract') {
+        continue
+      }
       const key = effectKey(frame, event)
       if (session.played.has(key)) {
         continue
       }
       session.played.add(key)
+      session.emitted.set(key, event)
       cues.push(event)
     }
   }
   return cues
+}
+
+function retractEvent(event: GameEvent): GameEvent | null {
+  if (event.type === 'hit') {
+    return { type: 'retract', of: 'hit', attacker: event.attacker, defender: event.defender }
+  }
+  if (event.type === 'attack') {
+    return { type: 'retract', of: 'attack', attacker: event.fighter }
+  }
+  if (event.type === 'ko') {
+    return { type: 'retract', of: 'ko', defender: event.fighter }
+  }
+  if (event.type === 'roundStart' || event.type === 'roundEnd' || event.type === 'matchEnd') {
+    return { type: 'retract', of: event.type }
+  }
+  return null
 }
 
 export function createRollback(state: MatchState, side: 0 | 1, delay: number, seed: number): Rollback {
@@ -177,6 +226,7 @@ export function createRollback(state: MatchState, side: 0 | 1, delay: number, se
     lastCheck: -1,
     eventLog: [],
     played: new Set(),
+    emitted: new Map(),
     recentChecks: [],
     acked: new Set(),
   }

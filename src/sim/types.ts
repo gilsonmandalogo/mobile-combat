@@ -99,12 +99,13 @@ export interface Aabb {
 }
 
 export type GameEvent =
-  | { type: 'attack'; fighter: FighterId; attack: AttackName | 'special' }
-  | { type: 'hit'; attacker: FighterId; defender: FighterId; damage: number; blocked: boolean }
+  | { type: 'attack'; fighter: FighterId; attack: AttackName | 'special' | 'super' }
+  | { type: 'hit'; attacker: FighterId; defender: FighterId; damage: number; blocked: boolean; critical?: boolean }
   | { type: 'ko'; fighter: FighterId }
   | { type: 'roundEnd'; winner: FighterId | 'draw'; round: number }
   | { type: 'roundStart'; round: number }
   | { type: 'matchEnd'; winner: FighterId }
+  | { type: 'retract'; of: 'hit' | 'attack' | 'ko' | 'roundStart' | 'roundEnd' | 'matchEnd'; attacker?: FighterId; defender?: FighterId }
 
 export interface MatchOptions {
   mode: MatchMode

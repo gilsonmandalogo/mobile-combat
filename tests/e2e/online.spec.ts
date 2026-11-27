@@ -110,6 +110,24 @@ test('two browsers fight in sync through the loopback transport', async ({ brows
   expect(sums[0]).not.toBe(0)
   await expect(host.getByTestId('net-status')).toContainText('Live')
 
+  const predicted = await host.evaluate((intent) => {
+    const api = (window as unknown as {
+      __MOBILE_COMBAT__: {
+        setIntent: (id: string, value: typeof intent) => void
+        stepFor: (seconds: number) => void
+        getAudio: () => { lastCue: string | null }
+        netInfo: () => { frame: number; confirmed: number }
+      }
+    }).__MOBILE_COMBAT__
+    api.setIntent('player1', { ...intent, attackDown: false, move: 1 })
+    api.stepFor(1)
+    api.setIntent('player1', intent)
+    api.stepFor(0.5)
+    return { cue: api.getAudio().lastCue, ...api.netInfo() }
+  }, { ...idle, attackDown: true })
+  expect(predicted.cue).toBe('hit')
+  expect(predicted.frame).toBeGreaterThan(predicted.confirmed)
+
   await host.keyboard.press('Escape')
   await expect.poll(async () => {
     await relay(host, guest)

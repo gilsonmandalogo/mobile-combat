@@ -173,14 +173,54 @@ describe('rollback netcode', () => {
         }
       }
     }
-    expect(takeEffects(left).some((event) => event.type === 'hit')).toBe(false)
+    const predicted = takeEffects(left).filter((event) => event.type === 'hit')
+    expect(predicted).toHaveLength(1)
+    expect(predicted[0]).toMatchObject({ blocked: false, attacker: 'player1' })
     for (const message of fromRight) {
       receiveSim(left, message, 30)
     }
-    const hits = takeEffects(left).filter((event) => event.type === 'hit')
+    const corrected = takeEffects(left)
+    const retracted = corrected.filter((event) => event.type === 'retract' && event.of === 'hit')
+    const hits = corrected.filter((event) => event.type === 'hit')
+    expect(retracted).toHaveLength(1)
     expect(hits).toHaveLength(1)
     expect(hits[0]).toMatchObject({ blocked: true, attacker: 'player1' })
-    expect(takeEffects(left).some((event) => event.type === 'hit')).toBe(false)
+    expect(takeEffects(left).some((event) => event.type === 'hit' || event.type === 'retract')).toBe(false)
+  })
+
+  it('plays a predicted hit immediately and does not repeat it once confirmed', () => {
+    const base = started()
+    const placed: MatchState = {
+      ...base,
+      fighters: [
+        { ...base.fighters[0], x: 0 },
+        { ...base.fighters[1], x: 0.85 },
+      ],
+    }
+    const left = createRollback(placed, 0, 3, 4)
+    const right = createRollback(placed, 1, 3, 4)
+    const attack: Intent = { ...EMPTY_INTENT, attackDown: true }
+    const heard: Array<{ damage: number }> = []
+    for (let frame = 0; frame < 36; frame += 1) {
+      const mine = frame >= 2 ? attack : EMPTY_INTENT
+      for (const message of pushLocal(left, mine, frame)) {
+        for (const reply of receiveSim(right, message, frame)) {
+          receiveSim(left, reply, frame)
+        }
+      }
+      for (const message of pushLocal(right, EMPTY_INTENT, frame)) {
+        for (const reply of receiveSim(left, message, frame)) {
+          receiveSim(right, reply, frame)
+        }
+      }
+      for (const event of takeEffects(left)) {
+        if (event.type === 'hit') {
+          heard.push({ damage: event.damage })
+        }
+      }
+    }
+    expect(heard.length).toBe(1)
+    expect(left.confirmed).toBeGreaterThan(8)
   })
 
   it('resends a checksum that was dropped', () => {

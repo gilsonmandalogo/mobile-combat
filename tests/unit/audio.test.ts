@@ -40,6 +40,7 @@ describe('synthesized audio', () => {
 
   it('schedules tones once a context exists', () => {
     const started: string[] = []
+    let stopped = 0
     const engine = new AudioEngine(() => ({
       currentTime: 0,
       destination: {} as AudioNode,
@@ -53,7 +54,7 @@ describe('synthesized audio', () => {
         },
         connect() {},
         start() { started.push('start') },
-        stop() {},
+        stop() { stopped += 1 },
       }) as unknown as OscillatorNode,
       createGain: () => ({
         gain: {
@@ -71,5 +72,8 @@ describe('synthesized audio', () => {
     expect(engine.snapshot().unlocked).toBe(true)
     expect(engine.snapshot().lastCue).toBe('attack')
     expect(started.length).toBeGreaterThan(1)
+    engine.cut()
+    expect(stopped).toBeGreaterThan(0)
+    expect(engine.snapshot().lastCue).toBeNull()
   })
 })

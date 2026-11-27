@@ -331,6 +331,13 @@ export default class Game {
   }
 
   private onEvent(event: GameEvent) {
+    if (event.type === 'retract') {
+      if (event.of === 'hit' && event.defender) {
+        this.flash[event.defender] = 0
+      }
+      this.audio.cut()
+      return
+    }
     if (event.type === 'attack') {
       this.audio.play('attack')
       return

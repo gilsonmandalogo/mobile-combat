@@ -27,6 +27,7 @@ export class AudioEngine {
   private musicClock = 0
   private musicStep = 0
   private theme = 'temple'
+  private live: Array<{ stop: () => void }> = []
 
   constructor(private readonly createContext: () => ToneContext | null = defaultContext) {}
 
@@ -58,6 +59,19 @@ export class AudioEngine {
   play(cue: CueName) {
     this.lastCue = cue
     this.voice(cueTones(cue), this.sfxVolume)
+  }
+
+  /** Stops the cues that are still sounding. A discarded prediction uses this. */
+  cut() {
+    for (const voice of this.live) {
+      try {
+        voice.stop()
+      } catch {
+        // already stopped
+      }
+    }
+    this.live = []
+    this.lastCue = null
   }
 
   update(dt: number) {
@@ -101,6 +115,7 @@ export class AudioEngine {
       gain.connect(context.destination)
       osc.start(when)
       osc.stop(when + tone.duration + 0.02)
+      this.live.push(osc)
       when += tone.duration * 0.72
     }
   }
