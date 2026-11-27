@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLobby, editLobby, lobbyMessage, mergeLobby, roomCode } from '@src/net/lobby'
-import { checksum, createRollback, INPUT_HISTORY, pushLocal, receiveSim } from '@src/net/rollback'
+import { checksum, createRollback, INPUT_HISTORY, pushLocal, receiveSim, takeEffects } from '@src/net/rollback'
 import type { Rollback, SimMessage } from '@src/net/rollback'
 import { packSdp, unpackSdp } from '@src/net/transport'
 import { nextRng } from '@src/ai/opponent'
@@ -136,6 +136,77 @@ describe('rollback netcode', () => {
     expect(shared).toBeGreaterThan(30)
     expect(lossy.left.sums[shared]).toBe(lossy.right.sums[shared])
     expect(lossy.left.desync).toBe(false)
+  })
+
+  it('replays a corrected hit exactly once', () => {
+    const base = started()
+    const placed: MatchState = {
+      ...base,
+      fighters: [
+        { ...base.fighters[0], x: 0 },
+        { ...base.fighters[1], x: 0.85 },
+      ],
+    }
+    const left = createRollback(placed, 0, 4, 1)
+    const right = createRollback({
+      ...placed,
+      fighters: [
+        { ...placed.fighters[0] },
+        { ...placed.fighters[1] },
+      ],
+    }, 1, 4, 1)
+    const attack: Intent = { ...EMPTY_INTENT, attackDown: true }
+    const block: Intent = { ...EMPTY_INTENT, block: true }
+    const fromRight: SimMessage[] = []
+    for (let frame = 0; frame < 24; frame += 1) {
+      const mine = frame >= 2 ? attack : EMPTY_INTENT
+      for (const message of pushLocal(left, mine, frame)) {
+        if (message.kind !== 'inputs') {
+          receiveSim(right, message, frame)
+        }
+      }
+      for (const message of pushLocal(right, block, frame)) {
+        if (message.kind === 'inputs') {
+          fromRight.push(message)
+        } else {
+          receiveSim(left, message, frame)
+        }
+      }
+    }
+    expect(takeEffects(left).some((event) => event.type === 'hit')).toBe(false)
+    for (const message of fromRight) {
+      receiveSim(left, message, 30)
+    }
+    const hits = takeEffects(left).filter((event) => event.type === 'hit')
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toMatchObject({ blocked: true, attacker: 'player1' })
+    expect(takeEffects(left).some((event) => event.type === 'hit')).toBe(false)
+  })
+
+  it('resends a checksum that was dropped', () => {
+    const left = createRollback(started(), 0, 2, 1)
+    const right = createRollback(started(), 1, 2, 1)
+    const dropped = new Set<number>()
+    for (let frame = 0; frame < 90; frame += 1) {
+      for (const message of pushLocal(left, EMPTY_INTENT, frame)) {
+        if (message.kind === 'check' && !dropped.has(message.frame) && !right.acked.has(message.frame)) {
+          dropped.add(message.frame)
+          continue
+        }
+        for (const reply of receiveSim(right, message, frame)) {
+          receiveSim(left, reply, frame)
+        }
+      }
+      for (const message of pushLocal(right, EMPTY_INTENT, frame)) {
+        for (const reply of receiveSim(left, message, frame)) {
+          receiveSim(right, reply, frame)
+        }
+      }
+    }
+    expect(dropped.size).toBeGreaterThan(0)
+    expect([...dropped].some((frame) => left.acked.has(frame))).toBe(true)
+    expect(left.desync).toBe(false)
+    expect(right.desync).toBe(false)
   })
 
   it('flags a checksum that does not match the confirmed frame', () => {

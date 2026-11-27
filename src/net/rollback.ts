@@ -4,6 +4,8 @@ import type { GameEvent, Intent, MatchState } from '@src/sim/types'
 
 export const FRAME_DT = 1 / 60
 export const INPUT_HISTORY = 12
+export const CHECK_KEEP = 4
+export const CHECK_RESEND = 20
 
 export interface NetInput {
   move: -1 | 0 | 1
@@ -19,6 +21,7 @@ export type SimMessage =
   | { kind: 'check'; frame: number; sum: number }
   | { kind: 'ping'; sent: number }
   | { kind: 'pong'; sent: number }
+  | { kind: 'ack'; frame: number }
 
 export interface Rollback {
   side: 0 | 1
@@ -38,6 +41,10 @@ export interface Rollback {
   sums: number[]
   checks: Map<number, number>
   lastCheck: number
+  eventLog: GameEvent[][]
+  played: Set<string>
+  recentChecks: Array<{ frame: number; sum: number }>
+  acked: Set<number>
 }
 
 const EMPTY_INPUT: NetInput = {
@@ -108,6 +115,44 @@ export function checksum(state: MatchState): number {
   return hash >>> 0
 }
 
+export function effectKey(frame: number, event: GameEvent): string {
+  if (event.type === 'hit') {
+    return `${frame}:hit:${event.attacker}:${event.defender}:${event.damage}:${event.blocked ? 1 : 0}`
+  }
+  if (event.type === 'attack') {
+    return `${frame}:attack:${event.fighter}:${event.attack}`
+  }
+  if (event.type === 'ko') {
+    return `${frame}:ko:${event.fighter}`
+  }
+  if (event.type === 'roundStart') {
+    return `${frame}:roundStart:${event.round}`
+  }
+  if (event.type === 'roundEnd') {
+    return `${frame}:roundEnd:${event.winner}:${event.round}`
+  }
+  return `${frame}:matchEnd:${event.winner}`
+}
+
+export function takeEffects(session: Rollback): GameEvent[] {
+  const cues: GameEvent[] = []
+  for (let frame = 0; frame <= session.confirmed; frame += 1) {
+    const events = session.eventLog[frame]
+    if (!events) {
+      continue
+    }
+    for (const event of events) {
+      const key = effectKey(frame, event)
+      if (session.played.has(key)) {
+        continue
+      }
+      session.played.add(key)
+      cues.push(event)
+    }
+  }
+  return cues
+}
+
 export function createRollback(state: MatchState, side: 0 | 1, delay: number, seed: number): Rollback {
   return {
     side,
@@ -127,13 +172,17 @@ export function createRollback(state: MatchState, side: 0 | 1, delay: number, se
     sums: [],
     checks: new Map(),
     lastCheck: -1,
+    eventLog: [],
+    played: new Set(),
+    recentChecks: [],
+    acked: new Set(),
   }
 }
 
 export function pushLocal(session: Rollback, intent: Intent, now = 0): SimMessage[] {
   const target = session.frame + session.delay
   session.local[target] = packInput(intent)
-  stepForward(session, false)
+  stepForward(session)
   const frames: Array<{ frame: number; input: NetInput }> = []
   for (let frame = Math.max(0, target - INPUT_HISTORY + 1); frame <= target; frame += 1) {
     const input = session.local[frame]
@@ -142,9 +191,12 @@ export function pushLocal(session: Rollback, intent: Intent, now = 0): SimMessag
     }
   }
   const outbound: SimMessage[] = [{ kind: 'inputs', side: session.side, frames }]
-  if (session.confirmed >= 15 && session.confirmed % 15 === 0 && session.confirmed !== session.lastCheck && session.sums[session.confirmed] !== undefined) {
-    session.lastCheck = session.confirmed
-    outbound.push({ kind: 'check', frame: session.confirmed, sum: session.sums[session.confirmed] })
+  const fresh = rememberCheck(session)
+  const pending = session.recentChecks.filter((item) => !session.acked.has(item.frame))
+  if (pending.length && (fresh || session.frame % CHECK_RESEND === 0)) {
+    for (const item of pending) {
+      outbound.push({ kind: 'check', frame: item.frame, sum: item.sum })
+    }
   }
   if (session.frame % 30 === 0) {
     outbound.push({ kind: 'ping', sent: now })
@@ -160,10 +212,13 @@ export function receiveSim(session: Rollback, message: SimMessage, now = 0): Sim
     session.ping = Math.max(0, now - message.sent)
     return []
   }
+  if (message.kind === 'ack') {
+    session.acked.add(message.frame)
+    return []
+  }
   if (message.kind === 'check') {
     session.checks.set(message.frame, message.sum)
-    considerChecks(session)
-    return []
+    return considerChecks(session)
   }
   if (message.side === session.side) {
     return []
@@ -183,15 +238,14 @@ export function receiveSim(session: Rollback, message: SimMessage, now = 0): Sim
     session.state = session.saved[earliest]
     session.frame = earliest
     while (session.frame < until) {
-      stepForward(session, true)
+      stepForward(session)
     }
   }
   session.confirmed = confirmedFrame(session)
-  considerChecks(session)
-  return []
+  return considerChecks(session)
 }
 
-function stepForward(session: Rollback, replaying: boolean) {
+function stepForward(session: Rollback) {
   const frame = session.frame
   const local = session.local[frame] ?? EMPTY_INPUT
   const known = session.remote[frame]
@@ -203,7 +257,8 @@ function stepForward(session: Rollback, replaying: boolean) {
   const result = stepMatch(session.state, intentsFor(session.side, local, remote), FRAME_DT)
   session.state = result.state
   session.sums[frame] = checksum(result.state)
-  session.events = replaying ? [] : result.events
+  session.eventLog[frame] = result.events
+  session.events = []
   session.frame += 1
   session.confirmed = confirmedFrame(session)
 }
@@ -237,13 +292,34 @@ function confirmedFrame(session: Rollback): number {
   return frame - 1
 }
 
-function considerChecks(session: Rollback) {
+function rememberCheck(session: Rollback): boolean {
+  let fresh = false
+  let frame = session.lastCheck < 0 ? 15 : session.lastCheck + 15
+  for (; frame <= session.confirmed; frame += 15) {
+    if (session.sums[frame] === undefined) {
+      continue
+    }
+    session.lastCheck = frame
+    session.recentChecks = session.recentChecks.filter((item) => item.frame !== frame)
+    session.recentChecks.push({ frame, sum: session.sums[frame] })
+    fresh = true
+  }
+  if (session.recentChecks.length > CHECK_KEEP) {
+    session.recentChecks = session.recentChecks.slice(-CHECK_KEEP)
+  }
+  return fresh
+}
+
+function considerChecks(session: Rollback): SimMessage[] {
+  const acks: SimMessage[] = []
   for (const [frame, sum] of session.checks) {
     if (frame <= session.confirmed && session.sums[frame] !== undefined) {
       if (session.sums[frame] !== sum) {
         session.desync = true
       }
       session.checks.delete(frame)
+      acks.push({ kind: 'ack', frame })
     }
   }
+  return acks
 }

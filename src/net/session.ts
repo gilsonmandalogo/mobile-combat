@@ -1,6 +1,6 @@
 import { byeMessage, editLobby, lobbyMessage, lobbyStatus, mergeLobby, roomLink } from '@src/net/lobby'
 import type { Lobby, LobbyMessage } from '@src/net/lobby'
-import { createRollback, pushLocal, receiveSim } from '@src/net/rollback'
+import { createRollback, pushLocal, receiveSim, takeEffects } from '@src/net/rollback'
 import type { Rollback, SimMessage } from '@src/net/rollback'
 import type { NetEnvelope, Transport } from '@src/net/transport'
 import type { GameEvent, Intent, MatchState } from '@src/sim/types'
@@ -42,6 +42,7 @@ export function disconnectedView(): OnlineView {
 export class NetPlay {
   rollback: Rollback | null = null
   pending: SimMessage[] = []
+  private queued: GameEvent[] = []
 
   constructor(
     readonly lobby: { current: Lobby },
@@ -107,7 +108,7 @@ export class NetPlay {
     for (const message of outbound) {
       this.transport.send({ channel: 'sim', body: message })
     }
-    return this.rollback.events
+    return this.drainEffects()
   }
 
   view(href: string): OnlineView {
@@ -138,5 +139,15 @@ export class NetPlay {
     for (const reply of extra) {
       this.transport.send({ channel: 'sim', body: reply })
     }
+    this.queued.push(...takeEffects(this.rollback))
+  }
+
+  private drainEffects(): GameEvent[] {
+    if (!this.rollback) {
+      return []
+    }
+    const events = this.queued.concat(takeEffects(this.rollback))
+    this.queued = []
+    return events
   }
 }
