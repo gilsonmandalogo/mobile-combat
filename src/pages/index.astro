@@ -53,6 +53,7 @@ import '@src/styles.css'
         <p id="pad-note" class="note" data-testid="pad-note"></p>
         <div class="menu-actions">
           <button id="start-match" data-testid="start-match" type="button" disabled>Loading arena…</button>
+          <button id="open-settings" data-testid="open-settings" type="button">Settings</button>
         </div>
       </section>
       <section id="pause-menu" class="panel" data-testid="pause-menu" hidden>
@@ -67,8 +68,9 @@ import '@src/styles.css'
       </section>
       <section id="settings-panel" class="panel settings-panel" data-testid="settings-panel" hidden>
         <h2>Settings</h2>
-        <div id="settings-body"></div>
+        <div id="settings-body" class="settings-scroll"></div>
         <div class="menu-actions">
+          <button id="reset-bindings" data-testid="reset-bindings" type="button">Reset to defaults</button>
           <button id="close-settings" data-testid="close-settings" type="button">Back</button>
         </div>
       </section>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultSettings, normalizeSettings, rebindKey, rebindPad } from '@src/settings/schema'
+import { defaultSettings, normalizeSettings, rebindKey, rebindPad, resetSettings } from '@src/settings/schema'
 
 describe('settings', () => {
   it('migrates the original keyboard map', () => {
@@ -45,5 +45,13 @@ describe('settings', () => {
     const pad = rebindPad(defaultSettings(), 'player2', 'block', 0)
     expect(pad.players.player2.pad.block).toBe(0)
     expect(pad.players.player2.pad.jump).toBe(5)
+  })
+
+  it('resets bindings and volumes while keeping the debug flag', () => {
+    const changed = rebindKey({ ...defaultSettings(), debug: true, sfxVolume: 0.1 }, 'player1', 'left', 'KeyQ')
+    const reset = resetSettings(changed)
+    expect(reset.players.player1.keys.left).toBe('KeyA')
+    expect(reset.sfxVolume).toBe(defaultSettings().sfxVolume)
+    expect(reset.debug).toBe(true)
   })
 })

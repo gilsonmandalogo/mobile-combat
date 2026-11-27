@@ -28,7 +28,7 @@ export interface Settings {
 export type PlayerSlot = keyof Settings['players']
 export type ActionName = keyof KeyBindings
 
-const ACTIONS: ActionName[] = ['left', 'right', 'jump', 'attackUp', 'attackDown', 'block']
+export const KEY_ACTIONS: ActionName[] = ['left', 'right', 'jump', 'attackUp', 'attackDown', 'block']
 
 export function defaultSettings(): Settings {
   return {
@@ -114,7 +114,7 @@ export function normalizeSettings(raw: unknown): Settings {
 export function rebindKey(settings: Settings, slot: PlayerSlot, action: ActionName, code: string): Settings {
   const player = settings.players[slot]
   const keys = { ...player.keys }
-  for (const other of ACTIONS) {
+  for (const other of KEY_ACTIONS) {
     if (other !== action && keys[other] === code) {
       keys[other] = keys[action]
     }
@@ -127,6 +127,12 @@ export function rebindKey(settings: Settings, slot: PlayerSlot, action: ActionNa
       [slot]: { ...player, keys },
     },
   }
+}
+
+export function resetSettings(current: Settings): Settings {
+  const fresh = defaultSettings()
+  fresh.debug = current.debug
+  return fresh
 }
 
 export function rebindPad(settings: Settings, slot: PlayerSlot, action: keyof PadBindings, button: number): Settings {
@@ -170,7 +176,7 @@ function normalizeKeys(raw: unknown, fallback: KeyBindings): KeyBindings {
     return { ...fallback }
   }
   const keys = { ...fallback }
-  for (const action of ACTIONS) {
+  for (const action of KEY_ACTIONS) {
     if (typeof raw[action] === 'string' && raw[action]) {
       keys[action] = raw[action] as string
     }

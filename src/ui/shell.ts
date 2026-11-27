@@ -1,8 +1,28 @@
-import { settingsStore } from '@stores/settings'
+import { KEY_ACTIONS, rebindKey, rebindPad, resetSettings, settingsStore } from '@stores/settings'
+import type { ActionName, PlayerSlot } from '@stores/settings'
 import type { DebugSnapshot } from '@src/debug/snapshot'
+import { buttonName } from '@src/input/gamepad'
+import type { PadBindings } from '@src/input/gamepad'
 import { deviceValue, readMatchSetup } from '@src/ui/setup'
 import { hudView } from '@src/ui/hud'
 import type { Difficulty, MatchMode } from '@src/sim/types'
+
+const ACTION_LABELS: Record<ActionName, string> = {
+  left: 'Left',
+  right: 'Right',
+  jump: 'Jump',
+  attackUp: 'Punch up',
+  attackDown: 'Punch down',
+  block: 'Block',
+}
+
+const PAD_ACTIONS: Array<keyof PadBindings> = ['jump', 'attackUp', 'attackDown', 'block']
+
+interface Listening {
+  kind: 'key' | 'pad'
+  slot: PlayerSlot | 'menu'
+  action: ActionName | 'menu'
+}
 
 export interface MatchHost {
   beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number }) => void
@@ -14,6 +34,7 @@ export interface MatchHost {
 export class Shell {
   private ready = false
   private lastState: DebugSnapshot | null = null
+  private listening: Listening | null = null
 
   constructor(private host: MatchHost) {}
 
@@ -32,7 +53,15 @@ export class Shell {
     this.bindClick('restart', () => this.host.restart())
     this.bindClick('quit', () => this.host.quitToMenu())
     this.bindClick('pause-settings', () => this.showSettings(true))
+    this.bindClick('open-settings', () => this.showSettings(true))
     this.bindClick('close-settings', () => this.showSettings(false))
+    this.bindClick('reset-bindings', () => {
+      this.listening = null
+      settingsStore.set(resetSettings(settingsStore.get()))
+      this.renderSettings()
+    })
+    window.addEventListener('keydown', (event) => this.captureKey(event), true)
+    this.watchPads()
 
     this.required<HTMLButtonElement>('start-match').addEventListener('click', () => {
       if (!this.ready) {
@@ -125,6 +154,9 @@ export class Shell {
     if (!panel) {
       return
     }
+    if (!show) {
+      this.listening = null
+    }
     if (show) {
       this.renderSettings()
     }
@@ -172,20 +204,133 @@ export class Shell {
     this.renderVolumes(body, settings)
     const note = document.createElement('p')
     note.className = 'note'
-    note.textContent = 'Keyboard and gamepad bindings for this browser.'
+    note.textContent = 'Click a binding, then press a key or gamepad button. A duplicate on the same player swaps.'
     body.append(note)
     for (const slot of ['player1', 'player2'] as const) {
-      const player = settings.players[slot]
-      const heading = document.createElement('h3')
-      heading.textContent = player.name
-      const list = document.createElement('ul')
-      for (const [action, code] of Object.entries(player.keys)) {
-        const item = document.createElement('li')
-        item.textContent = `${action}: ${code}`
-        list.append(item)
-      }
-      body.append(heading, list)
+      body.append(this.playerBindings(slot, settings))
     }
+    const menu = document.createElement('p')
+    menu.append('Menu ', this.bindButton('bind-menu', 'key', 'menu', 'menu', settings.menuKey, 'Press a key'))
+    body.append(menu)
+  }
+
+  private playerBindings(slot: PlayerSlot, settings: ReturnType<typeof settingsStore.get>): HTMLElement {
+    const player = settings.players[slot]
+    const section = document.createElement('section')
+    const heading = document.createElement('h3')
+    heading.textContent = player.name
+    const table = document.createElement('table')
+    table.className = 'bind-table'
+    const head = document.createElement('tr')
+    for (const label of ['Action', 'Keyboard', 'Gamepad']) {
+      const cell = document.createElement('th')
+      cell.textContent = label
+      head.append(cell)
+    }
+    table.append(head)
+    for (const action of KEY_ACTIONS) {
+      const row = document.createElement('tr')
+      const name = document.createElement('td')
+      name.textContent = ACTION_LABELS[action]
+      const keyCell = document.createElement('td')
+      keyCell.append(this.bindButton(
+        `bind-${slot}-${action}`,
+        'key',
+        slot,
+        action,
+        player.keys[action],
+        'Press a key',
+      ))
+      const padCell = document.createElement('td')
+      if (PAD_ACTIONS.includes(action as keyof PadBindings)) {
+        const padAction = action as keyof PadBindings
+        padCell.append(this.bindButton(
+          `pad-${slot}-${padAction}`,
+          'pad',
+          slot,
+          padAction,
+          buttonName(player.pad[padAction]),
+          'Press a button',
+        ))
+      } else {
+        padCell.textContent = 'Stick'
+      }
+      row.append(name, keyCell, padCell)
+      table.append(row)
+    }
+    section.append(heading, table)
+    return section
+  }
+
+  private bindButton(
+    testId: string,
+    kind: Listening['kind'],
+    slot: Listening['slot'],
+    action: Listening['action'],
+    label: string,
+    prompt: string,
+  ): HTMLButtonElement {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.dataset.testid = testId
+    const active = this.listening?.kind === kind
+      && this.listening.slot === slot
+      && this.listening.action === action
+    button.textContent = active ? prompt : label
+    button.addEventListener('click', () => {
+      this.listening = { kind, slot, action }
+      this.renderSettings()
+    })
+    return button
+  }
+
+  private captureKey(event: KeyboardEvent) {
+    if (!this.listening || this.listening.kind !== 'key' || !event.code) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    const current = settingsStore.get()
+    if (this.listening.slot === 'menu') {
+      settingsStore.set({ ...current, menuKey: event.code })
+    } else {
+      settingsStore.set(rebindKey(current, this.listening.slot, this.listening.action as ActionName, event.code))
+    }
+    this.listening = null
+    this.renderSettings()
+  }
+
+  private watchPads() {
+    let previous: boolean[][] = []
+    const tick = () => {
+      const pads = typeof navigator !== 'undefined' && navigator.getGamepads
+        ? navigator.getGamepads()
+        : []
+      if (this.listening?.kind === 'pad' && this.listening.slot !== 'menu') {
+        for (const pad of pads) {
+          if (!pad || this.listening?.kind !== 'pad' || this.listening.slot === 'menu') {
+            continue
+          }
+          const before = previous[pad.index] ?? []
+          for (let index = 0; index < pad.buttons.length; index += 1) {
+            if (pad.buttons[index].pressed && !before[index]) {
+              settingsStore.set(rebindPad(
+                settingsStore.get(),
+                this.listening.slot,
+                this.listening.action as keyof PadBindings,
+                index,
+              ))
+              this.listening = null
+              this.renderSettings()
+              break
+            }
+          }
+        }
+      }
+      previous = Array.from(pads).map((pad) => pad ? pad.buttons.map((button) => button.pressed) : [])
+      requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
   }
 
   private bindClick(id: string, action: () => void) {
