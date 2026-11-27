@@ -10,7 +10,7 @@ The first screen is the title. From there the path is main menu, mode and device
 
 - **Versus human** is local multiplayer. Each side can be a keyboard or a gamepad, including gamepad versus gamepad.
 - **Versus AI** is a solo match. Choose easy, normal, hard, or nightmare on the mode screen. The choice is stored with the other settings. The computer approaches, attacks, blocks, crouch-blocks lows, jumps in more often on higher difficulties, anti-airs a jump, and retreats when it is hurt. It reads the fighter's manifest and performs specials by entering the same input sequences a player would, choosing a fireball at range or an uppercut against a jump-in. Easier profiles react slower, mistime inputs, attack less, crouch less, and throw fewer specials. Its fighter is chosen on the same roster screen.
-- **Online** is on the main menu. Host shows a four-letter room code and a link. Guest types the code. Each player picks a fighter, the host picks the arena, and both press Ready. Input delay is 0 to 8 frames and is saved with the other settings. The match is lockstep rollback: both peers run the same fixed step, trade inputs for each frame, repeat the last remote input when a packet is late, and resimulate when the real input disagrees. A hit plays as soon as it is simulated. If a rollback discards that hit, the cue stops and the flash clears, and the corrected hit plays once. Confirming the same hit does not play it again. A checksum goes out every 15 confirmed frames. If confirmation skips one, it is still sent, and the last few checksums repeat until the other peer acks them. The HUD shows ping and Live, Desync, or Opponent left. Escape leaves the room. Rematch on the results panel waits until both accept, then the same room starts again with a new seed. Create offer and Accept code are a manual WebRTC fallback: paste the offer one way and the answer back. There is no game server. Trystero connects through public Nostr relays. `?net=loopback` swaps in an in-page transport so two browsers can be bridged without the internet.
+- **Online** is on the main menu. Host shows a four-letter room code and a link. Guest types the code. Each player picks a fighter, the host picks the arena, and both press Ready. Input delay is 0 to 8 frames and is saved with the other settings. The match is lockstep rollback: both peers run the same fixed step, trade inputs for each frame, repeat the last remote input when a packet is late, and resimulate when the real input disagrees. A hit is armed as soon as it is simulated, and the tone itself starts a fraction of a second later at zero gain. If a rollback discards that hit before the tone rises, the ramp is cancelled and nothing is heard. A tone that has already started fades out, and the corrected hit plays once. Confirming the same hit does not play it again. A checksum goes out every 15 confirmed frames. If confirmation skips one, it is still sent, and the last few checksums repeat until the other peer acks them. The HUD shows ping and Live, Desync, or Opponent left. Escape leaves the room. Rematch on the results panel waits until both accept, then the same room starts again with a new seed. Create offer and Accept code are a manual WebRTC fallback: paste the offer one way and the answer back. There is no game server. Trystero connects through public Nostr relays. `?net=loopback` swaps in an in-page transport so two browsers can be bridged without the internet.
 - **Fighters** opens the roster. Player 1 cycles with `A` and `D`. Player 2 cycles with the arrow keys. A stick or d-pad does the same for that pad. **Arenas** then opens the stage list.
 - A round lasts 60 seconds. Empty the opponent's life bar, or have more life when the clock hits zero. Equal life is a draw and nobody scores. The first banner is Round, then Fight. A K.O. where the winner never lost life is Flawless victory. Medallions under each health bar mark rounds won. First to win `roundsToWin` rounds (default 2, a best of three) wins the match. Health and positions reset between rounds. The results panel can rematch or return to the menu.
 - **Escape** or **Start** pauses a local round. Resume, restart, open settings, or quit to the menu. The clock stays frozen while the pause menu is up, and that menu lists each fighter's moves. In an online round, Escape leaves the room so one peer cannot freeze the simulation.
@@ -131,7 +131,7 @@ Stages live in `src/content/arenas/<id>/manifest.json` and are discovered the sa
 
 ## Local development
 
-Node 22 or newer. `.nvmrc` pins 22.
+Node 22 or newer. `.nvmrc` pins 22.14.0, and CI installs that version. `package.json` accepts any Node 22 or newer.
 
 ```bash
 yarn install
@@ -153,7 +153,7 @@ yarn test:unit
 yarn test:e2e
 ```
 
-`yarn test` runs the unit tests and then the browser tests. End-to-end tests start the dev server themselves and drive Chromium. Install the browser once with:
+`yarn test` runs the unit tests and then the browser tests. Unit tests load `vitest.config.mts` so Vitest imports Vite as ESM. End-to-end tests start the dev server themselves and drive Chromium. Install the browser once with:
 
 ```bash
 yarn playwright install chromium

@@ -6,19 +6,19 @@ A 3D fighting game built with [Astro](https://astro.build/) and [Three.js](https
 
 ### Tooling
 - Package manager is **Yarn (classic, v1)** — a `yarn.lock` is committed. Use `yarn`, not npm.
-- `.nvmrc` and `package.json` `engines` require Node 22. Node v22 is the version in this environment. Do not install Node 19.
+- `.nvmrc` pins Node 22.14.0. `package.json` `engines` allows Node 22 or newer. Do not install Node 19.
 
 ### Commands (see `package.json` scripts)
 - Dev server: `yarn dev` — starts Astro on `http://localhost:3000`. Use `yarn dev --host 0.0.0.0` to expose it on the network. This is a static single-page app; there is no backend service.
 - Lint: `yarn lint` — runs `eslint src --ext=.ts --fix`. Note the `--fix` flag means linting can rewrite source files in place.
 - Build: `yarn build` — outputs a static site to `dist/`.
-- There is no automated test suite in this repository.
+- Tests: `yarn test:unit` (Vitest, config is `vitest.config.mts`) and `yarn test:e2e` (Playwright). `yarn test` runs both.
 
 ### Running / testing the game (non-obvious)
 - The game is a 3D scene rendered to a `<canvas>`. Keyboard controls are bound to the canvas element, so you must **click the canvas first to give it focus** before key presses register.
 - Default Player 1 controls: `A`/`D` move, `Space` jump, `G` punch up, `V` punch down, `U`+`I` super. Player 2 uses arrow keys, `Equal`/`BracketRight` to punch, `Digit9`+`Digit0` super. Gamepad super is LT+RT. Bindings are in `src/settings/schema.ts`.
 - The debug overlay (top-left text showing game status, player life, round timer, scores, plus collider wireframes) is **hidden by default**. There is no in-game UI to toggle it. To enable it for testing, set the persisted setting in the browser console and reload:
   ```js
-  localStorage.setItem('settings', JSON.stringify({debug:true,inputs:{player1:{left:"KeyA",right:"KeyD",jump:"Space",attackUp:"KeyG",attackDown:"KeyV",block:"KeyY"},player2:{left:"ArrowLeft",right:"ArrowRight",jump:"ControlRight",attackUp:"Equal",attackDown:"BracketRight",block:"Backslash"},menu:"Escape"},inputType:"keyboard"}))
+  localStorage.setItem('settings', JSON.stringify({debug:true,inputs:{player1:{left:"KeyA",right:"KeyD",jump:"Space",attackUp:"KeyG",attackDown:"KeyV",block:"KeyY",crouch:"KeyS",superA:"KeyU",superB:"KeyI"},player2:{left:"ArrowLeft",right:"ArrowRight",jump:"ControlRight",attackUp:"Equal",attackDown:"BracketRight",block:"Backslash",crouch:"ArrowDown",superA:"Digit9",superB:"Digit0"},menu:"Escape"},inputType:"keyboard"}))
   ```
   The live round timer counting down (once per second) is a quick way to confirm the game loop is running.
