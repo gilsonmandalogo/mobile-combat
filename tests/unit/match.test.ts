@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { attackChips, characterById } from '@src/content/catalog'
 import { ATTACKS, ROUND_END_DELAY } from '@src/sim/constants'
 import { COMBAT } from '@src/sim/rules'
+import { createAiMemory, stepAi } from '@src/ai/opponent'
 import { createMatch, pauseMatch, quitToMenu, restartMatch, resumeMatch, startMatch, stepMatch, stepSeconds } from '@src/sim/match'
 import { EMPTY_INTENT } from '@src/sim/types'
 import type { FighterId, Intent, MatchState } from '@src/sim/types'
@@ -449,6 +450,56 @@ describe('character specials', () => {
     expect(next.state.fighters[1].life).toBe(100)
     expect(next.state.fighters[0].life).toBe(100)
     expect(next.state.banner).toBe('Round 2')
+  })
+
+  it('spends the meter on a super, chips on block, and lets the AI throw one', () => {
+    let state = place(fight(), 0, 0.95)
+    state = {
+      ...state,
+      critChance: 0,
+      fighters: [
+        { ...state.fighters[0], energy: COMBAT.energyMax },
+        state.fighters[1],
+      ],
+    }
+    const started = stepMatch(state, both({ super: true }), 1 / 60)
+    expect(started.state.fighters[0].action).toBe('super')
+    expect(started.state.fighters[0].energy).toBe(0)
+    expect(started.state.callout).toBe('SUPER')
+    expect(started.state.hitStop).toBeGreaterThan(0)
+    const empty = stepMatch(place(fight(), 0, 0.95), both({ super: true }), 1 / 60)
+    expect(empty.state.fighters[0].action).not.toBe('super')
+
+    let blocked = place(fight(), 0, 0.95)
+    blocked = {
+      ...blocked,
+      critChance: 0,
+      fighters: [
+        { ...blocked.fighters[0], energy: COMBAT.energyMax, action: 'super', actionTime: COMBAT.superStartup ?? 0.16, attackResolved: false },
+        { ...blocked.fighters[1], blocking: true, action: 'block' },
+      ],
+    }
+    const chip = stepMatch(blocked, { player1: { ...EMPTY_INTENT }, player2: { ...EMPTY_INTENT, block: true } }, 1 / 60)
+    const hit = chip.events.find((event) => event.type === 'hit')
+    expect(hit).toMatchObject({ blocked: true })
+    expect(chip.state.fighters[1].life).toBeGreaterThan(100 - COMBAT.superDamage)
+
+    const fired = []
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const ai = stepAi(createAiMemory(seed), { ...state.fighters[0], energy: COMBAT.energyMax, action: 'idle' }, { ...state.fighters[1], action: 'idle' }, 'nightmare', 1 / 60)
+      if (ai.intent.super) {
+        fired.push(seed)
+      }
+    }
+    expect(fired.length).toBeGreaterThan(0)
+    const easy = []
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const ai = stepAi(createAiMemory(seed), { ...state.fighters[0], energy: COMBAT.energyMax, action: 'idle' }, { ...state.fighters[1], action: 'idle' }, 'easy', 1 / 60)
+      if (ai.intent.super) {
+        easy.push(seed)
+      }
+    }
+    expect(fired.length).toBeGreaterThan(easy.length)
   })
 
   it('rolls a seeded critical, adds damage and meter, and hit-stops', () => {

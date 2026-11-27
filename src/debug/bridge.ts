@@ -11,6 +11,7 @@ export interface DebugApi {
   getAudio: () => AudioSnapshot
   setVirtualGamepad: (pad: PadSnapshot | null) => void
   setCritChance: (chance: number) => void
+  setEnergy: (id: FighterId, value: number) => void
 }
 
 export function debugQueryEnabled(search: string): boolean {

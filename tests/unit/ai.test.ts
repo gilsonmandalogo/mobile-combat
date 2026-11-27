@@ -63,6 +63,7 @@ describe('ai opponent', () => {
     expect(profiles.nightmare.special).toBeGreaterThan(profiles.hard.special)
     expect(profiles.nightmare.block).toBeGreaterThan(profiles.easy.block)
     expect(profiles.nightmare.jumpIn).toBeGreaterThan(profiles.easy.jumpIn)
+    expect(profiles.nightmare.superUse).toBeGreaterThan(profiles.easy.superUse)
     expect(profiles.nightmare.reaction).toBeLessThan(profiles.easy.reaction)
     expect(() => loadProfiles({ ...profiles, nightmare: { ...profiles.nightmare, accuracy: 2 } })).toThrow(/accuracy/)
 

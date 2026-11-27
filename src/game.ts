@@ -317,7 +317,7 @@ export default class Game {
       const pad = pads.find((item) => item.index === player.gamepadIndex) ?? null
       const result = gamepadIntent(pad, player.pad, this.padButtons[slot])
       if (frozen) {
-        return { ...result.intent, jump: false, attackUp: false, attackDown: false }
+        return { ...result.intent, jump: false, attackUp: false, attackDown: false, super: false }
       }
       this.padButtons[slot] = result.pressed
       return result.intent
@@ -344,7 +344,7 @@ export default class Game {
       return
     }
     if (event.type === 'attack') {
-      this.audio.play('attack')
+      this.audio.play(event.attack === 'super' ? 'super' : 'attack')
       return
     }
     if (event.type === 'ko') {
@@ -627,6 +627,13 @@ export default class Game {
       setCritChance: (chance: number) => {
         const critChance = Math.min(1, Math.max(0, chance))
         this.match = { ...this.match, critChance }
+      },
+      setEnergy: (id: FighterId, value: number) => {
+        const energy = Math.max(0, value)
+        this.match = {
+          ...this.match,
+          fighters: this.match.fighters.map((fighter) => fighter.id === id ? { ...fighter, energy } : fighter) as MatchState['fighters'],
+        }
       },
       setVirtualGamepad: (pad: PadSnapshot | null) => {
         if (!pad) {

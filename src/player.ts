@@ -119,6 +119,13 @@ export default class Player {
     if (!map) {
       return 'Idle'
     }
+    if (state.action === 'super') {
+      const named = map.super
+      if (named && this.clips[named]) {
+        return named
+      }
+      return map.punchUp
+    }
     if (state.action === 'attackUp' || state.action === 'jumpPunch' || state.action === 'special') {
       return map.punchUp
     }

@@ -193,6 +193,9 @@ function blockStunFor(hitstun: number): number {
 }
 
 function strikeChip(attacker: FighterState): number {
+  if (attacker.action === 'super') {
+    return chipRatio(COMBAT.superChip)
+  }
   if (attacker.action === 'special') {
     return chipRatio(attacker.special?.chip)
   }
@@ -485,14 +488,16 @@ function integrate(
   first = separated[0]
   second = separated[1]
 
+  const superStarted = (facedA.action !== 'super' && first.action === 'super')
+    || (facedB.action !== 'super' && second.action === 'super')
   let rng = state.rng
-  let hitStop = 0
+  let hitStop = superStarted ? COMBAT.superFreeze : 0
   if (resolveHits) {
     const resolved = resolveBoth(first, second, rng, state.critChance)
     first = resolved.first
     second = resolved.second
     rng = resolved.rng
-    hitStop = resolved.hitStop
+    hitStop = Math.max(hitStop, resolved.hitStop)
     events.push(...resolved.events)
     const shots = stepProjectiles(projectiles, first, second, dt, state.arena, rng, state.critChance)
     first = shots.first
@@ -503,8 +508,18 @@ function integrate(
     events.push(...shots.events)
   }
 
+  const shouted = superStarted && !events.some((event) => event.type === 'hit' && event.critical)
   return {
-    state: { ...state, fighters: [first, second], motions, projectiles, rng, hitStop: Math.max(state.hitStop, hitStop) },
+    state: {
+      ...state,
+      fighters: [first, second],
+      motions,
+      projectiles,
+      rng,
+      hitStop: Math.max(state.hitStop, hitStop),
+      callout: shouted ? 'SUPER' : state.callout,
+      calloutTime: shouted ? 1 : state.calloutTime,
+    },
     events,
   }
 }
@@ -513,7 +528,7 @@ function pushAttack(events: GameEvent[], before: FighterState, after: FighterSta
   if (isAttack(before.action) || !isAttack(after.action)) {
     return
   }
-  if (after.action === 'attackUp' || after.action === 'attackDown' || after.action === 'crouchPunch' || after.action === 'crouchKick' || after.action === 'jumpPunch' || after.action === 'jumpKick' || after.action === 'special') {
+  if (after.action === 'attackUp' || after.action === 'attackDown' || after.action === 'crouchPunch' || after.action === 'crouchKick' || after.action === 'jumpPunch' || after.action === 'jumpKick' || after.action === 'special' || after.action === 'super') {
     events.push({ type: 'attack', fighter: after.id, attack: after.action })
   }
 }
@@ -728,7 +743,7 @@ function continueAttack(
   arena: ArenaBounds,
 ): FighterState | null {
   const aerial = fighter.action === 'jumpPunch' || fighter.action === 'jumpKick'
-  if (!aerial && fighter.action !== 'attackUp' && fighter.action !== 'attackDown' && fighter.action !== 'crouchPunch' && fighter.action !== 'crouchKick' && fighter.action !== 'special') {
+  if (!aerial && fighter.action !== 'attackUp' && fighter.action !== 'attackDown' && fighter.action !== 'crouchPunch' && fighter.action !== 'crouchKick' && fighter.action !== 'special' && fighter.action !== 'super') {
     return null
   }
   const spec = fighter.action === 'special' ? fighter.special : attackSpec(fighter)
@@ -1075,6 +1090,10 @@ function stepFighter(
     vx = intent.move * speed
   }
 
+  if (intent.super && fighter.energy + 0.001 >= COMBAT.energyMax && !wantsCrouch) {
+    return beginSuper(base, fighter, arena)
+  }
+
   if (combo && !wantsCrouch) {
     return beginSpecial(base, fighter, combo, opponent, arena)
   }
@@ -1143,6 +1162,23 @@ function touchDown(
     blocking: false,
     crouching: false,
     special: null,
+  }
+}
+
+function beginSuper(base: FighterState, fighter: FighterState, arena: ArenaBounds): FighterState {
+  return {
+    ...base,
+    action: 'super',
+    actionTime: 0,
+    attackResolved: false,
+    energy: 0,
+    special: null,
+    x: clampX(fighter.x, arena),
+    y: 0,
+    vx: 0,
+    vy: 0,
+    blocking: false,
+    crouching: false,
   }
 }
 

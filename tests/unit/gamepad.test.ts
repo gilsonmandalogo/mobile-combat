@@ -32,6 +32,20 @@ describe('gamepad intents', () => {
     expect(gamepadIntent(dpad, DEFAULT_PAD, []).intent.move).toBe(-1)
   })
 
+  it('fires super from both triggers and does not crouch while they are held', () => {
+    const chord = pad()
+    chord.buttons[6] = { pressed: true, value: 1 }
+    chord.buttons[7] = { pressed: true, value: 1 }
+    const first = gamepadIntent(chord, DEFAULT_PAD, [])
+    expect(first.intent.super).toBe(true)
+    expect(first.intent.crouch).toBe(false)
+    const held = gamepadIntent(chord, DEFAULT_PAD, first.pressed)
+    expect(held.intent.super).toBe(false)
+    const leftOnly = pad()
+    leftOnly.buttons[6] = { pressed: true, value: 1 }
+    expect(gamepadIntent(leftOnly, DEFAULT_PAD, []).intent.super).toBe(false)
+  })
+
   it('ignores a disconnected pad and a stick inside the deadzone', () => {
     expect(gamepadIntent(null, DEFAULT_PAD, []).intent.move).toBe(0)
     expect(gamepadIntent(pad({ axes: [0.2, 0] }), DEFAULT_PAD, []).intent.move).toBe(0)

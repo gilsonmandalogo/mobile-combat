@@ -1,7 +1,7 @@
 import type { ArenaBounds, AttackSpec } from '@src/sim/constants'
 
 export type FighterId = 'player1' | 'player2'
-export type Action = 'idle' | 'walk' | 'jump' | 'prejump' | 'land' | 'crouch' | 'attackUp' | 'attackDown' | 'crouchPunch' | 'crouchKick' | 'jumpPunch' | 'jumpKick' | 'special' | 'block' | 'hitstun' | 'juggle' | 'knockdown' | 'ko'
+export type Action = 'idle' | 'walk' | 'jump' | 'prejump' | 'land' | 'crouch' | 'attackUp' | 'attackDown' | 'crouchPunch' | 'crouchKick' | 'jumpPunch' | 'jumpKick' | 'special' | 'super' | 'block' | 'hitstun' | 'juggle' | 'knockdown' | 'ko'
 export type InputToken = 'back' | 'forward' | 'up' | 'punch' | 'kick'
 export type SpecialEffect = 'projectile' | 'dash' | 'uppercut' | 'teleport'
 export type DeviceKind = 'keyboard' | 'gamepad' | 'ai'
@@ -18,6 +18,7 @@ export interface Intent {
   attackDown: boolean
   block: boolean
   crouch: boolean
+  super: boolean
 }
 
 export const EMPTY_INTENT: Intent = {
@@ -27,6 +28,7 @@ export const EMPTY_INTENT: Intent = {
   attackDown: false,
   block: false,
   crouch: false,
+  super: false,
 }
 
 export interface FighterState {

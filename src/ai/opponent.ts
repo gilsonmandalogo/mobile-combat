@@ -1,4 +1,5 @@
 import { profileFor } from '@src/ai/profiles'
+import { COMBAT } from '@src/sim/rules'
 import { intentForToken, pickSpecial, specialScript } from '@src/ai/specials'
 import type { ScriptBeat } from '@src/ai/specials'
 import { attackPhase, attackSpec, isAttack } from '@src/sim/hitboxes'
@@ -81,6 +82,11 @@ export function stepAi(
   } else if (self.life <= profile.retreatLife && distance < profile.prefer) {
     state = 'retreat'
     react = 0
+  } else if (ready && self.energy + 0.001 >= COMBAT.energyMax && distance < profile.attack + 0.4 && roll() < profile.superUse) {
+    return {
+      memory: { state: 'attack', cooldown: profile.attackCd, react: 0, seed, script: [], hold: 0, specialCd },
+      intent: { ...EMPTY_INTENT, super: true },
+    }
   } else if (ready && specialCd <= 0 && cooldown <= 0 && beginSpecial()) {
     return playScript(armedSpecial(), self.facing, dt)
   } else if (distance > profile.prefer) {

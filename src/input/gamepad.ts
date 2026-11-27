@@ -69,10 +69,10 @@ export function gamepadIntent(
   pad: PadSnapshot | null,
   bindings: PadBindings,
   previouslyPressed: boolean[],
-): { intent: { move: -1 | 0 | 1; jump: boolean; attackUp: boolean; attackDown: boolean; block: boolean; crouch: boolean }; pressed: boolean[] } {
+): { intent: { move: -1 | 0 | 1; jump: boolean; attackUp: boolean; attackDown: boolean; block: boolean; crouch: boolean; super: boolean }; pressed: boolean[] } {
   if (!pad || !pad.connected) {
     return {
-      intent: { move: 0, jump: false, attackUp: false, attackDown: false, block: false, crouch: false },
+      intent: { move: 0, jump: false, attackUp: false, attackDown: false, block: false, crouch: false, super: false },
       pressed: previouslyPressed,
     }
   }
@@ -95,6 +95,7 @@ export function gamepadIntent(
 
   const pressed = pad.buttons.map((button) => Boolean(button?.pressed))
   const edge = (index: number) => pressed[index] === true && previouslyPressed[index] !== true
+  const triggers = pressed[6] === true && pressed[7] === true
 
   return {
     intent: {
@@ -103,7 +104,8 @@ export function gamepadIntent(
       attackUp: edge(bindings.attackUp),
       attackDown: edge(bindings.attackDown),
       block: pressed[bindings.block] === true,
-      crouch: dpadDown || vertical > AXIS_DEADZONE || pressed[bindings.crouch] === true,
+      crouch: !triggers && (dpadDown || vertical > AXIS_DEADZONE || pressed[bindings.crouch] === true),
+      super: triggers && (edge(6) || edge(7)),
     },
     pressed,
   }

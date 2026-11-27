@@ -31,7 +31,7 @@ export interface Settings {
 export type PlayerSlot = keyof Settings['players']
 export type ActionName = keyof KeyBindings
 
-export const KEY_ACTIONS: ActionName[] = ['left', 'right', 'jump', 'attackUp', 'attackDown', 'block', 'crouch']
+export const KEY_ACTIONS: ActionName[] = ['left', 'right', 'jump', 'attackUp', 'attackDown', 'block', 'crouch', 'superA', 'superB']
 
 export function defaultSettings(): Settings {
   return {
@@ -54,6 +54,8 @@ export function defaultSettings(): Settings {
           attackDown: 'KeyV',
           block: 'KeyY',
           crouch: 'KeyS',
+          superA: 'KeyU',
+          superB: 'KeyI',
         },
         pad: { ...DEFAULT_PAD },
       },
@@ -69,6 +71,8 @@ export function defaultSettings(): Settings {
           attackDown: 'BracketRight',
           block: 'Backslash',
           crouch: 'ArrowDown',
+          superA: 'Digit9',
+          superB: 'Digit0',
         },
         pad: { ...DEFAULT_PAD },
       },

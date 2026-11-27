@@ -16,6 +16,7 @@ export type FighterPose =
   | 'jumpLand'
   | 'jumpAttack'
   | 'juggle'
+  | 'super'
 
 export function fighterPose(fighter: FighterState): FighterPose {
   if (fighter.action === 'ko') {
@@ -23,6 +24,9 @@ export function fighterPose(fighter: FighterState): FighterPose {
   }
   if (fighter.action === 'juggle') {
     return 'juggle'
+  }
+  if (fighter.action === 'super') {
+    return 'super'
   }
   if (fighter.action === 'jumpPunch' || fighter.action === 'jumpKick') {
     return 'jumpAttack'

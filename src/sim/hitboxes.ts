@@ -1,10 +1,11 @@
 import { AIR_HURT_HALF_W, AIR_HURT_HEIGHT, CROUCH_HURT_HEIGHT, HURT_HALF_W, HURT_HEIGHT } from '@src/sim/constants'
 import type { AttackSpec } from '@src/sim/constants'
+import { superAttack } from '@src/sim/rules'
 import type { Aabb, FighterState, HitLevel } from '@src/sim/types'
 
 export type AttackPhase = 'startup' | 'active' | 'recovery'
 
-const STRIKES = new Set<FighterState['action']>(['attackUp', 'attackDown', 'crouchPunch', 'crouchKick', 'jumpPunch', 'jumpKick', 'special'])
+const STRIKES = new Set<FighterState['action']>(['attackUp', 'attackDown', 'crouchPunch', 'crouchKick', 'jumpPunch', 'jumpKick', 'special', 'super'])
 
 export function isAttack(action: FighterState['action']): boolean {
   return STRIKES.has(action)
@@ -13,6 +14,9 @@ export function isAttack(action: FighterState['action']): boolean {
 export function attackSpec(fighter: FighterState): AttackSpec | null {
   if (fighter.action === 'attackUp' || fighter.action === 'attackDown' || fighter.action === 'crouchPunch' || fighter.action === 'crouchKick' || fighter.action === 'jumpPunch' || fighter.action === 'jumpKick') {
     return fighter.attacks[fighter.action]
+  }
+  if (fighter.action === 'super') {
+    return superAttack()
   }
   if (fighter.action === 'special' && fighter.special && fighter.special.effect !== 'projectile') {
     return fighter.special

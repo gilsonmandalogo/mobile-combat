@@ -10,6 +10,8 @@ const bindings = {
   attackDown: 'KeyV',
   block: 'KeyY',
   crouch: 'KeyS',
+  superA: 'KeyU',
+  superB: 'KeyI',
 }
 
 class FakeKeys implements KeyTarget {
@@ -39,7 +41,15 @@ describe('keyboard intents', () => {
       attackDown: false,
       block: true,
       crouch: false,
+      super: false,
     })
+  })
+
+  it('fires super only when both chord keys land together', () => {
+    const held = new Set(['KeyU', 'KeyI'])
+    expect(keyboardIntent(held, bindings, new Set(['KeyI'])).super).toBe(true)
+    expect(keyboardIntent(held, bindings, new Set()).super).toBe(false)
+    expect(keyboardIntent(new Set(['KeyU']), bindings, new Set(['KeyU'])).super).toBe(false)
   })
 
   it('cancels opposite directions', () => {

@@ -258,6 +258,34 @@ describe('rollback netcode', () => {
     expect(checksum(started())).toBe(checksum(started()))
   })
 
+  it('hashes the meter and keeps a super in sync', () => {
+    const base = started()
+    const charged = (): MatchState => ({
+      ...started(),
+      fighters: [
+        { ...started().fighters[0], energy: 100, x: 0 },
+        { ...started().fighters[1], x: 0.9 },
+      ] as MatchState['fighters'],
+    })
+    expect(checksum(charged())).not.toBe(checksum(base))
+    const left = createRollback(charged(), 0, 2, 4)
+    const right = createRollback(charged(), 1, 2, 4)
+    const superIntent = { ...EMPTY_INTENT, super: true }
+    for (let frame = 0; frame < 24; frame += 1) {
+      const mine = frame === 4 ? superIntent : EMPTY_INTENT
+      for (const message of pushLocal(left, mine, frame)) {
+        receiveSim(right, message, frame)
+      }
+      for (const message of pushLocal(right, EMPTY_INTENT, frame)) {
+        receiveSim(left, message, frame)
+      }
+    }
+    expect(left.desync).toBe(false)
+    expect(right.desync).toBe(false)
+    expect(left.state.fighters[0].action === 'super' || left.state.fighters[0].energy < 100).toBe(true)
+    expect(checksum(left.state)).toBe(checksum(right.state))
+  })
+
   it('starts the fight when both are ready and rematches on a new seed', () => {
     const host = createLobby('host', roomCode(12), 2, 7, 'colin', 'mayan-temple')
     const guest = createLobby('guest', host.code, 2, 1, 'maria', 'ember-pit')

@@ -14,6 +14,7 @@ export interface NetInput {
   attackDown: boolean
   block: boolean
   crouch: boolean
+  super: boolean
 }
 
 export type SimMessage =
@@ -55,6 +56,7 @@ const EMPTY_INPUT: NetInput = {
   attackDown: false,
   block: false,
   crouch: false,
+  super: false,
 }
 
 export function packInput(intent: Intent): NetInput {
@@ -66,6 +68,7 @@ export function packInput(intent: Intent): NetInput {
     attackDown: Boolean(intent.attackDown),
     block: Boolean(intent.block),
     crouch: Boolean(intent.crouch),
+    super: Boolean(intent.super),
   }
 }
 
@@ -76,6 +79,7 @@ export function sameInput(left: NetInput, right: NetInput): boolean {
     && left.attackDown === right.attackDown
     && left.block === right.block
     && left.crouch === right.crouch
+    && left.super === right.super
 }
 
 export function checksum(state: MatchState): number {

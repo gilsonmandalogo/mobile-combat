@@ -83,6 +83,7 @@ export const characterSchema = z.object({
     walkBackward: z.string().min(1),
     punchUp: z.string().min(1),
     punchDown: z.string().min(1),
+    super: z.string().min(1).optional(),
   }),
   model: z.discriminatedUnion('kind', [glbModelSchema, primitiveModelSchema]),
   moves: z.array(moveSchema).min(1),

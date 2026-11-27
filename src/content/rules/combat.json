@@ -10,5 +10,18 @@
   "critDamage": 1.5,
   "critEnergyScale": 3,
   "hitStop": 0.05,
-  "critHitStop": 0.12
+  "critHitStop": 0.12,
+  "superDamage": 36,
+  "superChip": 0.12,
+  "superStartup": 0.16,
+  "superActive": 0.16,
+  "superRecovery": 0.42,
+  "superReach": 1.35,
+  "superHitY": 0.9,
+  "superHitW": 1.5,
+  "superHitH": 1.15,
+  "superKnockback": 8,
+  "superHop": 5.2,
+  "superHitstun": 0.55,
+  "superFreeze": 0.28
 }

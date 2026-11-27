@@ -503,6 +503,28 @@ canvas {
   animation: banner-ko 0.4s ease;
 }
 
+#banner.banner-super {
+  color: #fff6c2;
+  letter-spacing: 0.18em;
+  animation: banner-ko 0.35s ease;
+}
+
+#shade {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 2, 8, 0.62);
+  pointer-events: none;
+}
+
+#overlay.is-super {
+  transform: scale(1.04);
+}
+
+#overlay.is-super #shade {
+  display: block;
+}
+
 #overlay.is-shake {
   animation: screen-shake 0.28s linear;
 }
@@ -610,5 +632,9 @@ canvas {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  #overlay.is-super {
+    transform: none;
   }
 }

@@ -20,6 +20,8 @@ const ACTION_LABELS: Record<ActionName, string> = {
   attackDown: 'Punch down',
   block: 'Block',
   crouch: 'Crouch',
+  superA: 'Super A',
+  superB: 'Super B',
 }
 
 const PAD_ACTIONS: Array<keyof PadBindings> = ['jump', 'attackUp', 'attackDown', 'block', 'crouch']
@@ -457,17 +459,24 @@ export class Shell {
     if (banner.hidden !== hideBanner || banner.textContent !== bannerText) {
       banner.hidden = hideBanner
       banner.textContent = bannerText
-      banner.classList.remove('banner-pop', 'banner-ko', 'banner-crit')
+      banner.classList.remove('banner-pop', 'banner-ko', 'banner-crit', 'banner-super')
       if (!hideBanner && bannerText && bannerText !== this.bannerText) {
         void banner.offsetWidth
-        const kind = bannerText === 'K.O.' ? 'banner-ko' : bannerText === 'CRITICAL!' ? 'banner-crit' : 'banner-pop'
+        const kind = bannerText === 'K.O.'
+          ? 'banner-ko'
+          : bannerText === 'CRITICAL!'
+            ? 'banner-crit'
+            : bannerText === 'SUPER'
+              ? 'banner-super'
+              : 'banner-pop'
         banner.classList.add(kind)
-        if (bannerText === 'CRITICAL!') {
-          this.impact('critical')
+        if (bannerText === 'CRITICAL!' || bannerText === 'SUPER') {
+          this.impact(bannerText === 'SUPER' ? 'super' : 'critical')
         }
       }
       this.bannerText = bannerText
     }
+    document.getElementById('overlay')?.classList.toggle('is-super', bannerText === 'SUPER')
     view.fighters.forEach((fighter, index) => {
       const slot = index === 0 ? 'player1' : 'player2'
       this.text(`hud-name-${slot}`, fighter.name)
@@ -662,6 +671,8 @@ export class Shell {
           buttonName(player.pad[padAction]),
           'Press a button',
         ))
+      } else if (action === 'superA' || action === 'superB') {
+        padCell.textContent = 'LT + RT'
       } else {
         padCell.textContent = 'Stick'
       }

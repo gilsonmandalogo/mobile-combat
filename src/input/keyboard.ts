@@ -8,6 +8,8 @@ export interface KeyBindings {
   attackDown: string
   block: string
   crouch: string
+  superA: string
+  superB: string
 }
 
 export interface KeyTarget {
@@ -35,6 +37,8 @@ export function keyboardIntent(
     attackDown: edges.has(bindings.attackDown),
     block: held.has(bindings.block),
     crouch: held.has(bindings.crouch),
+    super: (edges.has(bindings.superA) && held.has(bindings.superB))
+      || (edges.has(bindings.superB) && held.has(bindings.superA)),
   }
 }
 
