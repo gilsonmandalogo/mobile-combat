@@ -9,14 +9,15 @@ A 3D browser fighting game built with [Astro](https://astro.build/) and [Three.j
 The first screen is the title. From there the path is main menu, mode and devices, character select, arena select, then the fight. Nothing loads the stage until both players have confirmed it.
 
 - **Versus human** is local multiplayer. Each side can be a keyboard or a gamepad, including gamepad versus gamepad.
-- **Versus AI** is a solo match. Choose easy, normal, hard, or nightmare on the mode screen. The choice is stored with the other settings. The computer approaches, attacks, blocks, jumps low punches, and retreats when it is hurt. It reads the fighter's manifest and performs specials by entering the same input sequences a player would, choosing a fireball at range or an uppercut against a jump-in. Easier profiles react slower, mistime inputs, attack less, and throw fewer specials. Its fighter is chosen on the same roster screen.
+- **Versus AI** is a solo match. Choose easy, normal, hard, or nightmare on the mode screen. The choice is stored with the other settings. The computer approaches, attacks, blocks, crouch-blocks lows, jumps low punches, and retreats when it is hurt. It reads the fighter's manifest and performs specials by entering the same input sequences a player would, choosing a fireball at range or an uppercut against a jump-in. Easier profiles react slower, mistime inputs, attack less, crouch less, and throw fewer specials. Its fighter is chosen on the same roster screen.
+- **Online** is on the main menu. Host shows a four-letter room code and a link. Guest types the code. Each player picks a fighter, the host picks the arena, and both press Ready. Input delay is 0 to 8 frames and is saved with the other settings. The match is lockstep rollback: both peers run the same fixed step, trade inputs for each frame, repeat the last remote input when a packet is late, and resimulate when the real input disagrees. A checksum of confirmed frames flags a desync. The HUD shows ping and Live, Desync, or Opponent left. Escape leaves the room. Rematch on the results panel waits until both accept, then the same room starts again with a new seed. Create offer and Accept code are a manual WebRTC fallback: paste the offer one way and the answer back. There is no game server. Trystero connects through public Nostr relays. `?net=loopback` swaps in an in-page transport so two browsers can be bridged without the internet.
 - **Fighters** opens the roster. Player 1 cycles with `A` and `D`. Player 2 cycles with the arrow keys. A stick or d-pad does the same for that pad. **Arenas** then opens the stage list.
 - A round lasts 60 seconds. Empty the opponent's life bar, or have more life when the clock hits zero. The center banner calls the round, a K.O., and the match winner. The results panel can rematch or return to the menu.
-- **Escape** or **Start** pauses the round. Resume, restart, open settings, or quit to the menu. The clock stays frozen while the pause menu is up, and that menu lists each fighter's moves.
+- **Escape** or **Start** pauses a local round. Resume, restart, open settings, or quit to the menu. The clock stays frozen while the pause menu is up, and that menu lists each fighter's moves. In an online round, Escape leaves the room so one peer cannot freeze the simulation.
 
 Health bars, round pips, the clock, and a keyboard / gamepad / CPU tag stay on screen during the fight.
 
-Menus take the keyboard, the mouse, and a gamepad. The d-pad or left stick moves the gold focus ring, **A** confirms, and **B** goes back. Arrow keys do the same. A hover plays a short cue.
+Menus take the keyboard, the mouse, and a gamepad. The d-pad or left stick moves the gold focus ring, **A** confirms, and **B** goes back. Arrow keys do the same. A hover plays a short cue. Panels rise open and drop closed. Focus and hover lift the control. A health bar drops at once, and a pale trail catches up. A large hit flashes and shakes that bar. The round call and the K.O. banner scale in. `prefers-reduced-motion: reduce` cuts those transitions.
 
 ## Controls
 
@@ -28,13 +29,14 @@ Keys work as soon as the page is open. Default bindings:
 | Jump | `Space` | `Right Ctrl` |
 | Punch up / down | `G` / `V` | `=` / `]` |
 | Block | `Y` | `\` |
+| Crouch | `S` | `↓` |
 | Pause | `Escape` | `Escape` |
 
-A gamepad uses the standard mapping. In a round, the left stick or d-pad moves. **A** jumps, **X** punches up, **Y** punches down, and **RB** blocks. On a hit, the pad rumbles through `vibrationActuator` or `hapticActuators` when the browser provides one.
+A gamepad uses the standard mapping. In a round, the left stick or d-pad moves, and down on the stick, the d-pad, or **LT** crouches. **A** jumps, **X** punches up, **Y** punches down, and **RB** blocks. Crouch is also a rebindable button. On a hit, the pad rumbles through `vibrationActuator` or `hapticActuators` when the browser provides one.
 
-Specials are Mortal Kombat-style sequences of two or three inputs inside a short window. Directions are relative to the way the fighter is facing: back, forward, then a punch or a kick. Colin's Ember is back, forward, punch and throws a fireball. Maria's Needle is back, forward, kick and dashes in. Her Slip is back, up, kick and blinks past the opponent. Brute's Riser is forward, up, punch and launches. The pause menu prints the list for whoever is in the match, including Block. Holding up as the middle of a special does not jump, so the button can still finish the sequence.
+Specials are Mortal Kombat-style sequences of two or three inputs inside a short window. Directions are relative to the way the fighter is facing: back, forward, then a punch or a kick. Colin's Ember is back, forward, punch and throws a fireball. Maria's Needle is back, forward, kick and dashes in. Her Slip is back, up, kick and blinks past the opponent. Brute's Riser is forward, up, punch and launches. The pause menu prints the list for whoever is in the match, including Block and Crouch. Holding up as the middle of a special does not jump, so the button can still finish the sequence. Holding down crouches and will not walk. Crouch plus punch, or crouch plus kick, is the crouching attack from the manifest.
 
-Hold **Block** on the ground while facing the hit. The fighter leans back, the guard flashes blue, and the HUD reads BLOCK. A blocked strike deals chip damage instead of the full hit, then a short block stun and a smaller pushback. Chip is a fraction from 0 to 1 on each move and combo in the manifest. When it is omitted, the fraction is 0.2. A chip of 0 negates the strike. You cannot block in the air, and you cannot block a hit that comes from behind. Facing stays locked while the guard is up, so a cross-up such as Maria's Slip lands full if it connects from the back. There is no throw. A throw would ignore the guard. Every strike and projectile in the current roster can be chipped when the guard is legal. The AI blocks according to its difficulty profile.
+Hold **Block** on the ground while facing the hit. The fighter leans back, the guard flashes blue, and the HUD reads BLOCK. Crouching makes the hurtbox shorter and the guard low. A blocked strike deals chip damage instead of the full hit, then a short block stun and a smaller pushback. Chip is a fraction from 0 to 1 on each move and combo in the manifest. When it is omitted, the fraction is 0.2. A chip of 0 negates the strike. You cannot block in the air, and you cannot block a hit that comes from behind. Facing stays locked while the guard is up, so a cross-up such as Maria's Slip lands full if it connects from the back. There is no throw. A throw would ignore the guard. A standing block stops highs, mids, and overheads, including a jump-in. It does not stop a low. A crouch block stops mids and lows. It does not stop an overhead or a jump-in, and a high whiffs on the short hurtbox. Every other strike and projectile in the current roster can be chipped when the guard is legal. The AI blocks, crouch-blocks, and throws lows according to its difficulty profile.
 
 Open **Settings** from the main menu or the pause menu to rebind a key or a button: click the binding, then press the new input. Taking a key that the same player already uses swaps the two actions. **Reset to defaults** restores bindings and volumes. Choices are stored in `localStorage`.
 
@@ -66,7 +68,7 @@ Colin Cole and Maria Bennett use the models already in `public/assets/models/` (
     "license": "Original procedural model, MIT, no third-party mesh."
   },
   "moves": [
-    { "name": "Hammer", "input": "Punch up", "damage": 12, "chip": 0.2 }
+    { "name": "Hammer", "input": "Punch up", "damage": 12, "chip": 0.2, "slot": "attackUp", "hitLevel": "high", "height": "stand" }
   ],
   "combos": [
     {
@@ -85,15 +87,16 @@ Colin Cole and Maria Bennett use the models already in `public/assets/models/` (
       "hitH": 0.7,
       "knockback": 5,
       "hop": 8.5,
-      "chip": 0.5
+      "chip": 0.5,
+      "hitLevel": "overhead"
     }
   ]
 }
 ```
 
-`model.kind` may be `glb` with a `file` such as `assets/models/Your-Fighter.glb`, a `scale`, and a `license`. Combo `sequence` entries are `back`, `forward`, `up`, `punch`, or `kick` (two or three of them). `effect` is `projectile`, `dash`, `uppercut`, or `teleport`. `window` is seconds, at most 1.5. Optional `chip` on a move or combo is the fraction of damage that lands on a legal block. Leave it out to use 0.2. A broken field fails the load with the file path and the field name.
+`model.kind` may be `glb` with a `file` such as `assets/models/Your-Fighter.glb`, a `scale`, and a `license`. Combo `sequence` entries are `back`, `forward`, `up`, `punch`, or `kick` (two or three of them). `effect` is `projectile`, `dash`, `uppercut`, or `teleport`. `window` is seconds, at most 1.5. Optional `chip` on a move or combo is the fraction of damage that lands on a legal block. Leave it out to use 0.2. Optional `hitLevel` is `high`, `mid`, `low`, or `overhead`. Optional `height` is `stand` or `crouch`. `slot` is `attackUp`, `attackDown`, `crouchPunch`, or `crouchKick`. A crouch slot can also set `startup`, `active`, `recovery`, `reach`, `hitY`, `hitW`, `hitH`, `knockback`, and `hop`. A broken field fails the load with the file path and the field name.
 
-Difficulty profiles live in `src/content/ai/difficulties.json`. Each of easy, normal, hard, and nightmare sets reaction time, how often an input is wrong or late, aggression, how often a special is attempted, block chance, and how often a special is followed by another hit. The loader checks that file with zod.
+Difficulty profiles live in `src/content/ai/difficulties.json`. Each of easy, normal, hard, and nightmare sets reaction time, how often an input is wrong or late, aggression, how often a special is attempted, block chance, crouch-block chance, how often an attack is a low, and how often a special is followed by another hit. The loader checks that file with zod.
 
 ## Adding an arena
 
@@ -151,7 +154,7 @@ yarn test:e2e
 yarn playwright install chromium
 ```
 
-Append `?debug=1` to expose `window.__MOBILE_COMBAT__` (`getState`, `setIntent`, `stepFor`, `setVirtualGamepad`, `getAudio`). Add `&autostart=1` to skip the menus. `mode=ai`, `difficulty=nightmare`, `seed=1`, `characters=colin,maria`, and `arena=ember-pit` are optional. `difficulty` accepts easy, normal, hard, or nightmare. The debug overlay of collider wireframes is separate: it follows the `debug` flag inside the saved settings.
+Append `?debug=1` to expose `window.__MOBILE_COMBAT__` (`getState`, `setIntent`, `stepFor`, `setVirtualGamepad`, `getAudio`, and, with `net=loopback`, `takeNet`, `pushNet`, `netInfo`, `netSum`). Add `&autostart=1` to skip the menus. `mode=ai`, `difficulty=nightmare`, `seed=1`, `characters=colin,maria`, and `arena=ember-pit` are optional. `difficulty` accepts easy, normal, hard, or nightmare. `net=loopback` keeps online play on the in-page transport. The debug overlay of collider wireframes is separate: it follows the `debug` flag inside the saved settings.
 
 GitHub Actions runs lint, the typecheck, unit tests, and end-to-end tests on every push and pull request.
 
