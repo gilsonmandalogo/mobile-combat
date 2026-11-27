@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import Player from '@src/player'
-import { HeroName } from '@src/hero'
 import Animations from '@src/animations'
+import { characterById } from '@src/content/catalog'
+import type { CharacterDef } from '@src/content/schema'
 import { updateDebug } from '@src/debug'
 import { settingsStore } from '@stores/settings'
 import { contextStore } from '@stores/context'
@@ -10,7 +11,7 @@ import { snapshotMatch } from '@src/debug/snapshot'
 import type { DebugSnapshot } from '@src/debug/snapshot'
 import { hitbox, hurtbox } from '@src/sim/hitboxes'
 import { createMatch, pauseMatch, quitToMenu as menuState, restartMatch, resumeMatch, startMatch, stepMatch } from '@src/sim/match'
-import type { Aabb, Difficulty, FighterId, GameEvent, Intent, MatchMode, MatchState } from '@src/sim/types'
+import type { Aabb, Difficulty, FighterId, FighterProfile, GameEvent, Intent, MatchMode, MatchState } from '@src/sim/types'
 import { KeyboardTracker, keyboardIntent } from '@src/input/keyboard'
 import type { Shell } from '@src/ui/shell'
 import { gamepadIntent, mergeGamepads } from '@src/input/gamepad'
@@ -23,11 +24,15 @@ import type { PlayerSlot } from '@src/settings/schema'
 
 interface GameConstructor {
   roundTime: number
+  enterArena: () => Promise<void>
 }
 
 export default class Game {
   private player1?: Player
   private player2?: Player
+  private animations?: Animations
+  private loadedIds: [string, string] | null = null
+  private enterArena: () => Promise<void>
   private match: MatchState
   private keyboard: KeyboardTracker
   private forced: Record<FighterId, Intent | null> = { player1: null, player2: null }
@@ -45,8 +50,9 @@ export default class Game {
   private hurtHelpers: THREE.Box3Helper[]
   private hitHelpers: THREE.Box3Helper[]
 
-  constructor({ roundTime }: GameConstructor) {
+  constructor({ roundTime, enterArena }: GameConstructor) {
     this.roundTime = roundTime
+    this.enterArena = enterArena
     this.keyboard = new KeyboardTracker(window)
     this.match = this.freshMatch()
     window.addEventListener('pointerdown', (event) => {
@@ -67,35 +73,21 @@ export default class Game {
   }
 
   public async init() {
-    const animationController = new Animations()
-    await animationController.loadAnimations()
-
-    this.player1 = new Player({
-      playerName: 'Player 1',
-      heroName: HeroName.MrColinCole,
-      animations: animationController.animations,
-    })
-    this.player2 = new Player({
-      playerName: 'Player 2',
-      heroName: HeroName.MrColinCole,
-      animations: animationController.animations,
-    })
-
-    await Promise.all([
-      this.player1.loadData(),
-      this.player2.loadData(),
-    ])
-
     this.ready = true
     const params = new URLSearchParams(window.location.search)
     if (params.get('autostart') === '1') {
       const requested = params.get('difficulty')
       const difficulty: Difficulty = requested === 'easy' || requested === 'hard' ? requested : 'normal'
       const seed = Number(params.get('seed'))
-      this.beginMatch({
+      const characters = params.get('characters')?.split(',')
+      const ids: [string, string] = characters && characters.length === 2
+        ? [characters[0], characters[1]]
+        : ['colin', 'colin']
+      await this.beginMatch({
         mode: params.get('mode') === 'ai' ? 'ai' : 'local',
         difficulty,
         seed: Number.isFinite(seed) && seed > 0 ? Math.floor(seed) : 1,
+        characters: ids,
       })
     } else {
       this.present(false, 0)
@@ -109,8 +101,15 @@ export default class Game {
     shell.mount()
   }
 
-  public beginMatch(options: { mode: MatchMode; difficulty: Difficulty; seed?: number }) {
+  public pads(): PadSnapshot[] {
+    return this.connectedPads
+  }
+
+  public async beginMatch(options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string] }) {
     const settings = settingsStore.get()
+    const ids = options.characters ?? ['colin', 'colin']
+    await this.prepareFighters(ids)
+    await this.enterArena()
     const secondDevice = options.mode === 'ai'
       ? 'ai'
       : settings.players.player2.device === 'gamepad' ? 'gamepad' : 'keyboard'
@@ -127,8 +126,30 @@ export default class Game {
         secondDevice,
       ],
       seed: options.seed ?? 1,
+      profiles: [profileFrom(characterById(ids[0])), profileFrom(characterById(ids[1]))],
     })).state
     this.present(false, 0)
+  }
+
+  private async prepareFighters(ids: [string, string]) {
+    if (!this.animations) {
+      this.animations = new Animations()
+    }
+    if (!this.animations.animations.Idle) {
+      await this.animations.loadAnimations()
+    }
+    if (!this.player1 || !this.player2) {
+      this.player1 = new Player({ animations: this.animations.animations })
+      this.player2 = new Player({ animations: this.animations.animations })
+    }
+    const same = this.loadedIds && this.loadedIds[0] === ids[0] && this.loadedIds[1] === ids[1]
+    if (!same) {
+      await Promise.all([
+        this.player1.load(characterById(ids[0])),
+        this.player2.load(characterById(ids[1])),
+      ])
+      this.loadedIds = [ids[0], ids[1]]
+    }
   }
 
   public resume() {
@@ -353,6 +374,15 @@ export default class Game {
         this.virtualPads = this.virtualPads.filter((item) => item.index !== pad.index).concat(pad)
       },
     }
+  }
+}
+
+function profileFrom(def: CharacterDef): FighterProfile {
+  return {
+    characterId: def.id,
+    maxLife: def.stats.health,
+    speed: def.stats.speed,
+    damageScale: def.stats.damage,
   }
 }
 

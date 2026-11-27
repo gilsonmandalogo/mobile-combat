@@ -26,6 +26,7 @@ test('keyboard bindings can be remapped, persisted, and reset', async ({ page })
   await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyQ')
   await page.getByTestId('close-settings').click()
   await page.getByTestId('start-match').click()
+  await page.getByTestId('confirm-characters').click()
   await page.waitForFunction(() => {
     const api = (window as unknown as {
       __MOBILE_COMBAT__?: { getState: () => { introTime: number; status: string } }

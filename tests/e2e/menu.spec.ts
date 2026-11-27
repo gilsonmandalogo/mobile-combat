@@ -14,8 +14,14 @@ test('the main menu starts a versus-AI match with the chosen name', async ({ pag
   const start = page.getByTestId('start-match')
   await expect(start).toBeEnabled()
   await start.click()
+  await expect(page.getByTestId('character-select')).toBeVisible()
+  await page.getByTestId('confirm-characters').click()
 
   await expect(page.getByTestId('main-menu')).toBeHidden()
+  await page.waitForFunction(() => {
+    const api = (window as unknown as { __MOBILE_COMBAT__?: { getState: () => { status: string } } }).__MOBILE_COMBAT__
+    return api?.getState().status === 'running'
+  })
   const state = await page.evaluate(() => {
     const api = (window as unknown as {
       __MOBILE_COMBAT__: { getState: () => { status: string; mode: string; difficulty: string; fighters: Array<{ name: string; device: string }> } }

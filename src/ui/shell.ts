@@ -5,7 +5,9 @@ import { buttonName } from '@src/input/gamepad'
 import type { PadBindings } from '@src/input/gamepad'
 import { deviceValue, readMatchSetup } from '@src/ui/setup'
 import { hudView } from '@src/ui/hud'
+import { defaultPicks, loadCharacters, stepRoster } from '@src/content/catalog'
 import type { Difficulty, MatchMode } from '@src/sim/types'
+import type { PadSnapshot } from '@src/input/gamepad'
 
 const ACTION_LABELS: Record<ActionName, string> = {
   left: 'Left',
@@ -25,16 +27,21 @@ interface Listening {
 }
 
 export interface MatchHost {
-  beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number }) => void
+  beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string] }) => void | Promise<void>
   resume: () => void
   restart: () => void
   quitToMenu: () => void
+  pads: () => PadSnapshot[]
 }
 
 export class Shell {
   private ready = false
   private lastState: DebugSnapshot | null = null
   private listening: Listening | null = null
+  private screen: 'main' | 'characters' = 'main'
+  private roster = loadCharacters()
+  private picks = defaultPicks(this.roster)
+  private rosterAxis = [0, 0]
 
   constructor(private host: MatchHost) {}
 
@@ -51,7 +58,10 @@ export class Shell {
 
     this.bindClick('resume', () => this.host.resume())
     this.bindClick('restart', () => this.host.restart())
-    this.bindClick('quit', () => this.host.quitToMenu())
+    this.bindClick('quit', () => {
+      this.screen = 'main'
+      this.host.quitToMenu()
+    })
     this.bindClick('pause-settings', () => this.showSettings(true))
     this.bindClick('open-settings', () => this.showSettings(true))
     this.bindClick('close-settings', () => this.showSettings(false))
@@ -61,9 +71,26 @@ export class Shell {
       this.renderSettings()
     })
     window.addEventListener('keydown', (event) => this.captureKey(event), true)
+    window.addEventListener('keydown', (event) => this.steerCharacters(event))
     this.watchPads()
 
     this.required<HTMLButtonElement>('start-match').addEventListener('click', () => {
+      if (!this.ready) {
+        return
+      }
+      this.screen = 'characters'
+      this.renderRoster()
+      if (this.lastState) {
+        this.render(this.lastState)
+      }
+    })
+    this.bindClick('characters-back', () => {
+      this.screen = 'main'
+      if (this.lastState) {
+        this.render(this.lastState)
+      }
+    })
+    this.bindClick('confirm-characters', () => {
       if (!this.ready) {
         return
       }
@@ -76,7 +103,11 @@ export class Shell {
         device2: this.required<HTMLSelectElement>('device2').value,
       })
       this.persistSetup(setup)
-      this.host.beginMatch({ mode: setup.mode, difficulty: setup.difficulty })
+      const ids: [string, string] = [
+        this.roster[this.picks.player1].id,
+        this.roster[this.picks.player2].id,
+      ]
+      void this.host.beginMatch({ mode: setup.mode, difficulty: setup.difficulty, characters: ids })
     })
 
     window.addEventListener('gamepadconnected', () => this.refreshPads())
@@ -97,7 +128,12 @@ export class Shell {
   render(state: DebugSnapshot) {
     this.lastState = state
     const settingsOpen = this.settingsOpen()
-    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu' || settingsOpen
+    const choosing = state.status === 'menu' && this.screen === 'characters' && !settingsOpen
+    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu' || settingsOpen || choosing
+    const roster = document.getElementById('character-select')
+    if (roster) {
+      roster.hidden = !choosing
+    }
     const pause = document.getElementById('pause-menu')
     if (pause) {
       pause.hidden = state.status !== 'paused' || settingsOpen
@@ -300,12 +336,75 @@ export class Shell {
     this.renderSettings()
   }
 
+  private renderRoster() {
+    for (const slot of ['player1', 'player2'] as const) {
+      const selected = this.picks[slot]
+      const character = this.roster[selected]
+      this.text(`pick-name-${slot}`, character ? `${character.name} · ${character.stats.health} hp` : '')
+      const list = document.getElementById(`roster-${slot}`)
+      if (!list || !character) {
+        continue
+      }
+      list.replaceChildren()
+      this.roster.forEach((item, index) => {
+        const card = document.createElement('button')
+        card.type = 'button'
+        card.className = index === selected ? 'roster-card selected' : 'roster-card'
+        card.dataset.testid = `character-card-${item.id}-${slot}`
+        const mark = document.createElement('span')
+        mark.className = 'mark'
+        mark.style.background = item.portrait.color
+        mark.textContent = item.portrait.mark
+        const label = document.createElement('span')
+        label.textContent = item.name
+        card.append(mark, label)
+        card.addEventListener('click', () => {
+          this.picks[slot] = index
+          this.renderRoster()
+        })
+        list.append(card)
+      })
+    }
+  }
+
+  private steerCharacters(event: KeyboardEvent) {
+    if (this.screen !== 'characters' || this.listening) {
+      return
+    }
+    if (event.code === 'KeyA' || event.code === 'KeyD') {
+      event.preventDefault()
+      this.picks.player1 = stepRoster(this.picks.player1, event.code === 'KeyD' ? 1 : -1, this.roster.length)
+      this.renderRoster()
+    }
+    if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+      event.preventDefault()
+      this.picks.player2 = stepRoster(this.picks.player2, event.code === 'ArrowRight' ? 1 : -1, this.roster.length)
+      this.renderRoster()
+    }
+  }
+
+  private steerRosterPads(pads: PadSnapshot[]) {
+    if (this.screen !== 'characters') {
+      return
+    }
+    for (const slot of [0, 1] as const) {
+      const pad = pads.find((item) => item.index === slot && item.connected)
+      const axis = pad?.axes[0] ?? 0
+      const direction = pad?.buttons[14]?.pressed ? -1 : pad?.buttons[15]?.pressed ? 1 : axis <= -0.6 ? -1 : axis >= 0.6 ? 1 : 0
+      if (direction !== 0 && this.rosterAxis[slot] === 0) {
+        const key = slot === 0 ? 'player1' : 'player2'
+        this.picks[key] = stepRoster(this.picks[key], direction, this.roster.length)
+        this.renderRoster()
+      }
+      this.rosterAxis[slot] = direction
+    }
+  }
+
   private watchPads() {
     let previous: boolean[][] = []
     const tick = () => {
-      const pads = typeof navigator !== 'undefined' && navigator.getGamepads
-        ? navigator.getGamepads()
-        : []
+      const pads = readPads(this.host.pads())
+      this.steerRosterPads(pads)
       if (this.listening?.kind === 'pad' && this.listening.slot !== 'menu') {
         for (const pad of pads) {
           if (!pad || this.listening?.kind !== 'pad' || this.listening.slot === 'menu') {
@@ -384,4 +483,26 @@ export class Shell {
     }
     return element as T
   }
+}
+
+function readPads(virtual: PadSnapshot[]): PadSnapshot[] {
+  if (virtual.length) {
+    return virtual
+  }
+  if (typeof navigator === 'undefined' || !navigator.getGamepads) {
+    return []
+  }
+  return Array.from(navigator.getGamepads()).flatMap((pad) => {
+    if (!pad) {
+      return []
+    }
+    return [{
+      index: pad.index,
+      connected: pad.connected,
+      axes: Array.from(pad.axes),
+      buttons: Array.from(pad.buttons).map((button) => ({ pressed: button.pressed, value: button.value })),
+      mapping: pad.mapping,
+      id: pad.id,
+    }]
+  })
 }

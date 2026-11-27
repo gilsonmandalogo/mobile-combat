@@ -41,6 +41,9 @@ export interface FighterState {
   attackResolved: boolean
   ko: boolean
   device: DeviceKind
+  characterId: string
+  speed: number
+  damageScale: number
 }
 
 export interface MatchState {
@@ -85,4 +88,12 @@ export interface MatchOptions {
   names: [string, string]
   devices: [DeviceKind, DeviceKind]
   seed: number
+  profiles?: [FighterProfile, FighterProfile]
+}
+
+export interface FighterProfile {
+  characterId?: string
+  maxLife?: number
+  speed?: number
+  damageScale?: number
 }

@@ -56,6 +56,25 @@ import '@src/styles.css'
           <button id="open-settings" data-testid="open-settings" type="button">Settings</button>
         </div>
       </section>
+      <section id="character-select" class="panel roster-panel" data-testid="character-select" hidden>
+        <p class="eyebrow">Roster</p>
+        <h2>Choose your fighter</h2>
+        <p class="tagline">Player 1 uses A and D. Player 2 uses the arrow keys. A stick or d-pad does the same.</p>
+        <div class="roster-grid">
+          <div>
+            <p data-testid="pick-name-player1" class="pick-name"></p>
+            <div id="roster-player1" class="roster" data-testid="roster-player1"></div>
+          </div>
+          <div>
+            <p data-testid="pick-name-player2" class="pick-name"></p>
+            <div id="roster-player2" class="roster" data-testid="roster-player2"></div>
+          </div>
+        </div>
+        <div class="menu-actions">
+          <button id="confirm-characters" data-testid="confirm-characters" type="button">Fight</button>
+          <button id="characters-back" data-testid="characters-back" type="button">Back</button>
+        </div>
+      </section>
       <section id="pause-menu" class="panel" data-testid="pause-menu" hidden>
         <h2>Paused</h2>
         <p class="tagline">The round clock is stopped.</p>

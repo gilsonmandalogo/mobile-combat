@@ -1,7 +1,7 @@
 import { ATTACKS, BLOCK_CHIP, GRAVITY, INTRO_TIME, JUMP_SPEED, KNOCKBACK_DECAY, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, SPAWN_X, STAGE_MAX_X, STAGE_MIN_X, attackDuration } from '@src/sim/constants'
 import { attackPhase, hitbox, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
 import { EMPTY_INTENT } from '@src/sim/types'
-import type { FighterId, FighterState, GameEvent, Intent, MatchOptions, MatchState } from '@src/sim/types'
+import type { FighterId, FighterProfile, FighterState, GameEvent, Intent, MatchOptions, MatchState } from '@src/sim/types'
 
 export interface StepResult {
   state: MatchState
@@ -23,7 +23,9 @@ export function createFighter(
   x: number,
   facing: 1 | -1,
   device: FighterState['device'],
+  profile: FighterProfile = {},
 ): FighterState {
+  const maxLife = profile.maxLife ?? MAX_LIFE
   return {
     id,
     name,
@@ -32,8 +34,8 @@ export function createFighter(
     vx: 0,
     vy: 0,
     facing,
-    life: MAX_LIFE,
-    maxLife: MAX_LIFE,
+    life: maxLife,
+    maxLife,
     score: 0,
     action: 'idle',
     actionTime: 0,
@@ -43,6 +45,9 @@ export function createFighter(
     attackResolved: false,
     ko: false,
     device,
+    characterId: profile.characterId ?? 'colin',
+    speed: profile.speed ?? MOVE_SPEED,
+    damageScale: profile.damageScale ?? 1,
   }
 }
 
@@ -57,8 +62,8 @@ export function createMatch(options: MatchOptions): MatchState {
     timeLeft: options.roundTime,
     introTime: 0,
     fighters: [
-      createFighter('player1', options.names[0], -SPAWN_X, 1, options.devices[0]),
-      createFighter('player2', options.names[1], SPAWN_X, -1, options.devices[1]),
+      createFighter('player1', options.names[0], -SPAWN_X, 1, options.devices[0], options.profiles?.[0]),
+      createFighter('player2', options.names[1], SPAWN_X, -1, options.devices[1], options.profiles?.[1]),
     ],
     matchPending: false,
     winner: null,
@@ -77,6 +82,7 @@ export function restartMatch(state: MatchState): MatchState {
     names: [state.fighters[0].name, state.fighters[1].name],
     devices: [state.fighters[0].device, state.fighters[1].device],
     seed: state.seed,
+    profiles: [profileOf(state.fighters[0]), profileOf(state.fighters[1])],
   })).state
 }
 
@@ -88,7 +94,17 @@ export function quitToMenu(state: MatchState): MatchState {
     names: [state.fighters[0].name, state.fighters[1].name],
     devices: [state.fighters[0].device, state.fighters[1].device],
     seed: state.seed,
+    profiles: [profileOf(state.fighters[0]), profileOf(state.fighters[1])],
   })
+}
+
+function profileOf(fighter: FighterState): FighterProfile {
+  return {
+    characterId: fighter.characterId,
+    maxLife: fighter.maxLife,
+    speed: fighter.speed,
+    damageScale: fighter.damageScale,
+  }
 }
 
 export function startMatch(state: MatchState): StepResult {
@@ -390,10 +406,11 @@ function previewHit(attacker: FighterState, defender: FighterState): HitPreview 
   }
 
   const spec = ATTACKS[attacker.action]
+  const rawDamage = Math.max(1, Math.round(spec.damage * attacker.damageScale))
   const facesAttacker = (defender.facing === 1 && attacker.x >= defender.x)
     || (defender.facing === -1 && attacker.x <= defender.x)
   const blocked = defender.blocking && facesAttacker && defender.y < 0.35
-  const damage = blocked ? Math.max(1, Math.round(spec.damage * BLOCK_CHIP)) : spec.damage
+  const damage = blocked ? Math.max(1, Math.round(rawDamage * BLOCK_CHIP)) : rawDamage
   const dir = Math.sign(defender.x - attacker.x) || attacker.facing
 
   return {
@@ -485,16 +502,17 @@ function stepFighter(fighter: FighterState, intent: Intent, dt: number): Fighter
   const grounded = vertical.y <= 0
   let action: FighterState['action'] = grounded ? 'idle' : 'jump'
   let vx = 0
+  const speed = fighter.speed
 
   if (intent.block && grounded) {
     action = 'block'
-    vx = intent.move * MOVE_SPEED * 0.28
+    vx = intent.move * speed * 0.28
   } else if (!grounded) {
     action = 'jump'
-    vx = intent.move * MOVE_SPEED * 0.8
+    vx = intent.move * speed * 0.8
   } else if (intent.move !== 0) {
     action = 'walk'
-    vx = intent.move * MOVE_SPEED
+    vx = intent.move * speed
   }
 
   if (grounded && (intent.attackUp || intent.attackDown)) {

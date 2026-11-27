@@ -3,9 +3,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import Game from '@src/game'
 import { Shell } from '@src/ui/shell'
 import { contextStore } from '@stores/context'
-import { getLevelClassByName } from '@src/utils'
+import MayanTempleLevel from '@levels/mayanTemple'
 
 const scene = new THREE.Scene()
+scene.background = new THREE.Color('#07060a')
 contextStore.setKey('scene', scene)
 
 const renderer = new THREE.WebGLRenderer()
@@ -17,17 +18,40 @@ renderer.domElement.tabIndex = 0
 renderer.domElement.dataset.testid = 'game-canvas'
 document.body.appendChild(renderer.domElement)
 
-const levelClass = getLevelClassByName('Mayan-Temple')
-const levelController = new levelClass()
-const level = await levelController.loadLevel()
-scene.add(level.scene)
+let camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(
+  42,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  200,
+)
+camera.position.set(0, 2.2, 8.5)
+camera.lookAt(0, 1.1, 0)
 
-const camera = level.cameras[0] as THREE.PerspectiveCamera
-camera.aspect = window.innerWidth / window.innerHeight
-camera.updateProjectionMatrix()
+let levelController: MayanTempleLevel | null = null
+let arenaPromise: Promise<void> | null = null
+
+function enterArena(): Promise<void> {
+  if (!arenaPromise) {
+    arenaPromise = mountTemple()
+  }
+  return arenaPromise
+}
+
+async function mountTemple() {
+  levelController = new MayanTempleLevel()
+  const model = await levelController.loadLevel()
+  scene.add(model.scene)
+  const embedded = model.cameras[0]
+  if (embedded instanceof THREE.PerspectiveCamera) {
+    embedded.aspect = window.innerWidth / window.innerHeight
+    embedded.updateProjectionMatrix()
+    camera = embedded
+  }
+}
 
 const gameController = new Game({
   roundTime: 60,
+  enterArena,
 })
 const shell = new Shell(gameController)
 gameController.attachShell(shell)
@@ -54,7 +78,7 @@ function animate() {
 
   controls.update()
   gameController.update(delta)
-  levelController.update(delta)
+  levelController?.update(delta)
 
   render()
 }

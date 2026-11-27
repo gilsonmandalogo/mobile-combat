@@ -1,111 +1,118 @@
 import * as THREE from 'three'
-import type { HeroName } from '@src/hero'
-import type Hero from '@src/hero'
-import { getHeroClassByName } from '@src/utils'
-import { ErrorUndefinedProperty } from '@src/errors'
+import type { CharacterDef } from '@src/content/schema'
 import { contextStore } from '@stores/context'
+import { loadCharacterModel } from '@src/view/model'
 import type { FighterState } from '@src/sim/types'
 
-const PUNCH_CLIPS = new Set(['PunchUp', 'PunchDown'])
-
-function clipFor(state: FighterState): string {
-  if (state.action === 'attackUp') {
-    return 'PunchUp'
-  }
-  if (state.action === 'attackDown') {
-    return 'PunchDown'
-  }
-  if (state.action === 'walk') {
-    if (Math.sign(state.vx) === state.facing) {
-      return 'WalkForward'
-    }
-    if (Math.sign(state.vx) === -state.facing) {
-      return 'WalkBackward'
-    }
-  }
-  return 'Idle'
-}
-
 interface PlayerConstructor {
-  heroName: HeroName
   animations: Record<string, THREE.AnimationClip>
-  playerName: string
 }
 
 export default class Player {
-  private _hero?: Hero
-  public get hero() {
-    if (!this._hero) {
-      throw new ErrorUndefinedProperty('hero')
-    }
-    return this._hero
-  }
-
-  private _ready = false
-  public get ready() {
-    return this._ready
-  }
-
-  readonly playerName: string
+  private ready = false
   private scene = contextStore.get().scene
   private animations: Record<string, THREE.AnimationClip>
-  private heroName: HeroName
+  private definition?: CharacterDef
+  private actor?: THREE.Group
+  private primitive = false
   private animationMixer?: THREE.AnimationMixer
   private clips: Record<string, THREE.AnimationAction> = {}
-  private currentAnimation = 'Idle'
+  private currentAnimation = ''
   private emissive = new Map<THREE.Material, { color: THREE.Color; intensity: number }>()
 
-  constructor({ heroName, animations, playerName }: PlayerConstructor) {
-    this.heroName = heroName
+  constructor({ animations }: PlayerConstructor) {
     this.animations = animations
-    this.playerName = playerName
   }
 
-  public async loadData() {
-    const heroClass = getHeroClassByName(this.heroName)
-    this._hero = new heroClass({})
-    const heroMesh = await this.hero.loadMesh()
-    this.scene.add(heroMesh.scene)
-    this.rememberMaterials(heroMesh.scene)
-
-    this.animationMixer = new THREE.AnimationMixer(heroMesh.scene)
-    for (const [name, clip] of Object.entries(this.animations)) {
-      const action = this.animationMixer.clipAction(clip)
-      if (PUNCH_CLIPS.has(name)) {
-        action.clampWhenFinished = true
-        action.setLoop(THREE.LoopOnce, 1)
+  public async load(def: CharacterDef) {
+    this.dispose()
+    this.definition = def
+    this.primitive = def.model.kind === 'primitive'
+    this.actor = await loadCharacterModel(def)
+    this.scene.add(this.actor)
+    this.rememberMaterials(this.actor)
+    this.animationMixer = new THREE.AnimationMixer(this.actor)
+    if (!this.primitive) {
+      for (const clipName of new Set(Object.values(def.animations))) {
+        const clip = this.animations[clipName]
+        if (!clip) {
+          continue
+        }
+        const action = this.animationMixer.clipAction(clip)
+        if (clipName.startsWith('Punch')) {
+          action.clampWhenFinished = true
+          action.setLoop(THREE.LoopOnce, 1)
+        }
+        this.clips[clipName] = action
       }
-      this.clips[name] = action
+      const idle = def.animations.idle
+      this.currentAnimation = idle
+      this.clips[idle]?.play()
     }
+    this.ready = true
+  }
 
-    this.clips['WalkForward'].timeScale = 1.5
-    this.clips['WalkBackward'].timeScale = 1.1
-    this.clips['PunchUp'].timeScale = 1.35
-    this.clips['PunchDown'].timeScale = 1.25
-    this.clips[this.currentAnimation].play()
-    this._ready = true
+  public dispose() {
+    if (this.actor) {
+      this.scene.remove(this.actor)
+      this.actor = undefined
+    }
+    this.animationMixer?.stopAllAction()
+    this.clips = {}
+    this.emissive.clear()
+    this.ready = false
   }
 
   public sync(state: FighterState, flash: number, delta: number, animate: boolean) {
-    if (!this.ready || !this.hero.ready) {
+    if (!this.ready || !this.actor || !this.definition) {
       return
     }
 
-    const actor = this.hero.actor
-    actor.position.x = state.x
-    actor.position.y = state.y
-    actor.rotation.y = state.facing === 1 ? Math.PI / 2 : -Math.PI / 2
+    this.actor.position.x = state.x
+    this.actor.position.y = state.y
+    this.actor.rotation.y = state.facing === 1 ? Math.PI / 2 : -Math.PI / 2
     const fall = state.action === 'ko' ? Math.min(1, state.actionTime / 0.45) : 0
-    actor.rotation.z = -state.facing * fall * (Math.PI / 2.4)
+    let lean = -state.facing * fall * (Math.PI / 2.4)
+    if (this.primitive && (state.action === 'attackUp' || state.action === 'attackDown')) {
+      lean += -state.facing * 0.35
+      this.actor.position.y += Math.sin(Math.min(1, state.actionTime) * Math.PI) * 0.08
+    }
+    if (this.primitive && state.action === 'walk') {
+      this.actor.position.y += Math.abs(Math.sin(state.actionTime * 8)) * 0.05
+    }
+    this.actor.rotation.z = lean
     this.tint(flash, state.blocking)
 
-    const next = clipFor(state)
-    const restart = PUNCH_CLIPS.has(next) && state.actionTime < 0.05
-    this.playClip(next, restart)
-
-    if (animate && this.animationMixer) {
-      this.animationMixer.update(delta)
+    if (!this.primitive) {
+      const next = this.clipName(state)
+      const restart = next.startsWith('Punch') && state.actionTime < 0.05
+      this.playClip(next, restart)
+      if (animate && this.animationMixer) {
+        this.animationMixer.update(delta)
+      }
     }
+  }
+
+  private clipName(state: FighterState): string {
+    const map = this.definition?.animations
+    if (!map) {
+      return 'Idle'
+    }
+    if (state.action === 'attackUp') {
+      return map.punchUp
+    }
+    if (state.action === 'attackDown') {
+      return map.punchDown
+    }
+    if (state.action === 'walk') {
+      if (Math.sign(state.vx) === state.facing) {
+        return map.walkForward
+      }
+      if (Math.sign(state.vx) === -state.facing) {
+        return map.walkBackward
+      }
+    }
+    return map.idle
   }
 
   private rememberMaterials(root: THREE.Object3D) {

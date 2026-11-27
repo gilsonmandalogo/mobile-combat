@@ -1,0 +1,23 @@
+{
+  "id": "brute",
+  "name": "Brute",
+  "portrait": { "color": "#8d2f2f", "mark": "B" },
+  "stats": { "health": 130, "speed": 2.5, "damage": 1.35 },
+  "animations": {
+    "idle": "Idle",
+    "walkForward": "WalkForward",
+    "walkBackward": "WalkBackward",
+    "punchUp": "PunchUp",
+    "punchDown": "PunchDown"
+  },
+  "model": {
+    "kind": "primitive",
+    "color": "#8d2f2f",
+    "scale": 1.15,
+    "license": "Original procedural model, MIT, no third-party mesh."
+  },
+  "moves": [
+    { "name": "Hammer", "input": "Punch up", "damage": 12 },
+    { "name": "Stomp", "input": "Punch down", "damage": 19 }
+  ]
+}

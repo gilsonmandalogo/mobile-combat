@@ -130,6 +130,47 @@ canvas {
   padding: 0.45rem 0.55rem;
 }
 
+.roster-panel {
+  width: min(760px, calc(100vw - 1.5rem));
+}
+
+.roster-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+
+.pick-name {
+  margin: 0 0 0.35rem;
+  color: var(--gold);
+}
+
+.roster {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.roster-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: left;
+}
+
+.roster-card .mark {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  color: #140e08;
+  font-weight: 700;
+}
+
+.roster-card.selected {
+  outline: 2px solid var(--gold);
+}
+
 .menu-actions {
   display: flex;
   flex-direction: column;

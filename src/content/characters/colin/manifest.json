@@ -1,0 +1,23 @@
+{
+  "id": "colin",
+  "name": "Colin Cole",
+  "portrait": { "color": "#c9863a", "mark": "C" },
+  "stats": { "health": 100, "speed": 3.4, "damage": 1 },
+  "animations": {
+    "idle": "Idle",
+    "walkForward": "WalkForward",
+    "walkBackward": "WalkBackward",
+    "punchUp": "PunchUp",
+    "punchDown": "PunchDown"
+  },
+  "model": {
+    "kind": "glb",
+    "file": "assets/models/Mr-Colin-Cole.glb",
+    "scale": 1.5,
+    "license": "Existing project model shipped with Mobile Combat."
+  },
+  "moves": [
+    { "name": "Jab", "input": "Punch up", "damage": 9 },
+    { "name": "Sweep", "input": "Punch down", "damage": 14 }
+  ]
+}

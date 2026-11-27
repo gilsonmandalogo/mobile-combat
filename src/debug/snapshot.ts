@@ -14,6 +14,7 @@ export interface DebugFighter {
   device: string
   blocking: boolean
   ko: boolean
+  characterId: string
 }
 
 export interface DebugSnapshot {
@@ -48,6 +49,7 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     device: fighter.device,
     blocking: fighter.blocking,
     ko: fighter.ko,
+    characterId: fighter.characterId,
   })) as [DebugFighter, DebugFighter]
 
   return {

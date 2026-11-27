@@ -185,4 +185,29 @@ describe('match simulation', () => {
     const resumed = stepSeconds(resumeMatch(stepped.state), both({ move: 1 }), 0.3)
     expect(resumed.state.fighters[0].x).toBeGreaterThan(paused.fighters[0].x)
   })
+
+  it('keeps a character\'s health and speed through the round and a restart', () => {
+    const started = startMatch(createMatch({
+      mode: 'local',
+      difficulty: 'normal',
+      roundTime: 20,
+      names: ['Red', 'Blue'],
+      devices: ['keyboard', 'keyboard'],
+      seed: 1,
+      profiles: [
+        { characterId: 'maria', maxLife: 86, speed: 6, damageScale: 0.85 },
+        { characterId: 'brute', maxLife: 130, speed: 2.5, damageScale: 1.35 },
+      ],
+    }))
+    const open = { ...started.state, introTime: 0, banner: null }
+    expect(open.fighters[0].life).toBe(86)
+    expect(open.fighters[1].characterId).toBe('brute')
+    const origin = open.fighters[0].x
+    const moved = stepSeconds(open, both({ move: 1 }), 0.4)
+    expect(moved.state.fighters[0].x - origin).toBeGreaterThan(2)
+    const restarted = restartMatch(moved.state)
+    expect(restarted.fighters[0].life).toBe(86)
+    expect(restarted.fighters[0].speed).toBe(6)
+    expect(restarted.fighters[1].maxLife).toBe(130)
+  })
 })
