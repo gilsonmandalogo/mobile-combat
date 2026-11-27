@@ -11,10 +11,25 @@ import '@src/styles.css'
   </head>
   <body>
     <div id="overlay">
-      <section id="main-menu" class="panel menu-panel" data-testid="main-menu">
-        <p class="eyebrow">Temple arena</p>
+      <canvas id="embers" data-testid="embers"></canvas>
+      <section id="title-screen" data-testid="title-screen">
+        <p class="eyebrow">First to two rounds</p>
         <h1>Mobile Combat</h1>
-        <p class="tagline">Two fighters. One stone floor. First to two rounds.</p>
+        <p class="tagline">The floor is stone. The clock is short.</p>
+        <button id="title-start" data-testid="title-start" type="button" disabled>Loading…</button>
+      </section>
+      <section id="main-menu" class="panel menu-panel" data-testid="main-menu" hidden>
+        <p class="eyebrow">Main menu</p>
+        <h1>Mobile Combat</h1>
+        <p class="tagline">Choose a fight or change the bindings.</p>
+        <div class="menu-actions">
+          <button id="main-fight" data-testid="main-fight" type="button">Fight</button>
+          <button id="open-settings" data-testid="open-settings" type="button">Settings</button>
+        </div>
+      </section>
+      <section id="setup-menu" class="panel menu-panel" data-testid="setup-menu" hidden>
+        <p class="eyebrow">Match</p>
+        <h2>Mode and devices</h2>
         <label>
           Mode
           <select id="mode" data-testid="mode-select">
@@ -52,8 +67,8 @@ import '@src/styles.css'
         </div>
         <p id="pad-note" class="note" data-testid="pad-note"></p>
         <div class="menu-actions">
-          <button id="start-match" data-testid="start-match" type="button" disabled>Loading arena…</button>
-          <button id="open-settings" data-testid="open-settings" type="button">Settings</button>
+          <button id="start-match" data-testid="start-match" type="button" disabled>Loading…</button>
+          <button id="setup-back" data-testid="setup-back" data-back type="button">Back</button>
         </div>
       </section>
       <section id="character-select" class="panel roster-panel" data-testid="character-select" hidden>
@@ -72,7 +87,7 @@ import '@src/styles.css'
         </div>
         <div class="menu-actions">
           <button id="confirm-characters" data-testid="confirm-characters" type="button">Arenas</button>
-          <button id="characters-back" data-testid="characters-back" type="button">Back</button>
+          <button id="characters-back" data-testid="characters-back" data-back type="button">Back</button>
         </div>
       </section>
       <section id="arena-select" class="panel" data-testid="arena-select" hidden>
@@ -83,7 +98,7 @@ import '@src/styles.css'
         <div id="arena-list" class="roster" data-testid="arena-list"></div>
         <div class="menu-actions">
           <button id="confirm-arena" data-testid="confirm-arena" type="button">Fight</button>
-          <button id="arenas-back" data-testid="arenas-back" type="button">Back</button>
+          <button id="arenas-back" data-testid="arenas-back" data-back type="button">Back</button>
         </div>
       </section>
       <section id="pause-menu" class="panel" data-testid="pause-menu" hidden>
@@ -94,7 +109,15 @@ import '@src/styles.css'
           <button id="resume" data-testid="resume" type="button">Resume</button>
           <button id="restart" data-testid="restart" type="button">Restart</button>
           <button id="pause-settings" data-testid="pause-settings" type="button">Settings</button>
-          <button id="quit" data-testid="quit" type="button">Quit to menu</button>
+          <button id="quit" data-testid="quit" data-back type="button">Quit to menu</button>
+        </div>
+      </section>
+      <section id="results-panel" class="panel" data-testid="results-panel" hidden>
+        <p class="eyebrow">Result</p>
+        <h2 data-testid="results-title">Match</h2>
+        <div class="menu-actions">
+          <button id="results-rematch" data-testid="results-rematch" type="button">Rematch</button>
+          <button id="results-menu" data-testid="results-menu" data-back type="button">Menu</button>
         </div>
       </section>
       <section id="settings-panel" class="panel settings-panel" data-testid="settings-panel" hidden>
@@ -102,7 +125,7 @@ import '@src/styles.css'
         <div id="settings-body" class="settings-scroll"></div>
         <div class="menu-actions">
           <button id="reset-bindings" data-testid="reset-bindings" type="button">Reset to defaults</button>
-          <button id="close-settings" data-testid="close-settings" type="button">Back</button>
+          <button id="close-settings" data-testid="close-settings" data-back type="button">Back</button>
         </div>
       </section>
       <div id="hud" data-testid="hud" hidden>

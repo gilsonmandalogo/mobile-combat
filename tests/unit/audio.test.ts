@@ -4,7 +4,7 @@ import { AudioEngine } from '@src/audio/engine'
 
 describe('synthesized audio', () => {
   it('keeps every cue inside a short audible recipe', () => {
-    for (const name of ['menu', 'attack', 'hit', 'block', 'ko', 'round', 'win'] as const) {
+    for (const name of ['menu', 'hover', 'attack', 'hit', 'block', 'ko', 'round', 'win'] as const) {
       const tones = cueTones(name)
       expect(tones.length).toBeGreaterThan(0)
       for (const tone of tones) {

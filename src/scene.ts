@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { arenaById } from '@src/content/catalog'
 import Game from '@src/game'
+import { startEmbers } from '@src/ui/embers'
 import { Shell } from '@src/ui/shell'
 import { contextStore } from '@stores/context'
 import { mountArena } from '@src/view/arena'
@@ -52,6 +53,11 @@ const gameController = new Game({
   roundTime: 60,
   enterArena,
 })
+const emberCanvas = document.getElementById('embers')
+if (emberCanvas instanceof HTMLCanvasElement) {
+  startEmbers(emberCanvas)
+}
+
 const shell = new Shell(gameController)
 gameController.attachShell(shell)
 await gameController.init()

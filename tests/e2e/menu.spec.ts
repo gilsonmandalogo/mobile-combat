@@ -2,7 +2,9 @@ import { expect, test } from '@playwright/test'
 
 test('the main menu starts a versus-AI match with the chosen name', async ({ page }) => {
   await page.goto('/mobile-combat/?debug=1')
-  await expect(page.getByTestId('main-menu')).toBeVisible()
+  await page.getByTestId('title-start').click()
+  await page.getByTestId('main-fight').click()
+  await expect(page.getByTestId('setup-menu')).toBeVisible()
   await expect(page.getByTestId('difficulty-select')).toBeHidden()
 
   await page.getByTestId('mode-select').selectOption('ai')

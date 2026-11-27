@@ -40,6 +40,7 @@ export default class Game {
   private virtualPads: PadSnapshot[] = []
   private connectedPads: PadSnapshot[] = []
   private padButtons: Record<PlayerSlot, boolean[]> = { player1: [], player2: [] }
+  private startWasDown = false
   private ready = false
   private ai: AiMemory | null = null
   private audio = new AudioEngine()
@@ -105,6 +106,10 @@ export default class Game {
 
   public pads(): PadSnapshot[] {
     return this.connectedPads
+  }
+
+  public play(cue: 'menu' | 'hover') {
+    this.audio.play(cue)
   }
 
   public async beginMatch(options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string]; arena?: string }) {
@@ -244,6 +249,11 @@ export default class Game {
       : []
     const pads = mergeGamepads(native as Array<HapticGamepad | null> | null, this.virtualPads)
     this.connectedPads = pads
+    const startDown = pads.some((pad) => pad.buttons[9]?.pressed)
+    if (startDown && !this.startWasDown) {
+      this.togglePause()
+    }
+    this.startWasDown = startDown
     const fromDevice = {
       player1: this.intentFor('player1', settings, edges, pads, dt, simulate),
       player2: this.intentFor('player2', settings, edges, pads, dt, simulate),

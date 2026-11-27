@@ -6,6 +6,8 @@ import type { PadBindings } from '@src/input/gamepad'
 import { deviceValue, readMatchSetup } from '@src/ui/setup'
 import { hudView } from '@src/ui/hud'
 import { defaultArena, defaultPicks, loadArenas, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
+import { focusItems, moveFocus, paintFocus } from '@src/ui/focus'
+import type { FocusDirection } from '@src/ui/focus'
 import type { Difficulty, MatchMode } from '@src/sim/types'
 import type { PadSnapshot } from '@src/input/gamepad'
 
@@ -28,6 +30,7 @@ interface Listening {
 
 export interface MatchHost {
   beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string]; arena?: string }) => void | Promise<void>
+  play: (cue: 'menu' | 'hover') => void
   resume: () => void
   restart: () => void
   quitToMenu: () => void
@@ -38,7 +41,11 @@ export class Shell {
   private ready = false
   private lastState: DebugSnapshot | null = null
   private listening: Listening | null = null
-  private screen: 'main' | 'characters' | 'arenas' = 'main'
+  private screen: 'title' | 'main' | 'setup' | 'characters' | 'arenas' = 'title'
+  private hovered: EventTarget | null = null
+  private titleHeld = false
+  private focusId: string | null = null
+  private padNav = { x: 0, y: 0, a: false, b: false }
   private roster = loadCharacters()
   private picks = defaultPicks(this.roster)
   private rosterAxis = [0, 0]
@@ -61,6 +68,11 @@ export class Shell {
 
     this.bindClick('resume', () => this.host.resume())
     this.bindClick('restart', () => this.host.restart())
+    this.bindClick('results-rematch', () => this.host.restart())
+    this.bindClick('results-menu', () => {
+      this.screen = 'main'
+      this.host.quitToMenu()
+    })
     this.bindClick('quit', () => {
       this.screen = 'main'
       this.host.quitToMenu()
@@ -76,6 +88,16 @@ export class Shell {
     window.addEventListener('keydown', (event) => this.captureKey(event), true)
     window.addEventListener('keydown', (event) => this.steerCharacters(event))
     window.addEventListener('keydown', (event) => this.steerArenas(event))
+    window.addEventListener('keydown', (event) => this.confirmTitleKey(event))
+    window.addEventListener('keydown', (event) => this.moveMenuKey(event))
+    document.body.addEventListener('pointerover', (event) => {
+      const target = event.target
+      if (!(target instanceof HTMLButtonElement) || target.disabled || target === this.hovered) {
+        return
+      }
+      this.hovered = target
+      this.host.play('hover')
+    })
     this.watchPads()
 
     this.required<HTMLButtonElement>('start-match').addEventListener('click', () => {
@@ -88,8 +110,15 @@ export class Shell {
         this.render(this.lastState)
       }
     })
+    this.bindClick('title-start', () => {
+      if (this.ready) {
+        this.showScreen('main')
+      }
+    })
+    this.bindClick('main-fight', () => this.showScreen('setup'))
+    this.bindClick('setup-back', () => this.showScreen('main'))
     this.bindClick('characters-back', () => {
-      this.screen = 'main'
+      this.screen = 'setup'
       if (this.lastState) {
         this.render(this.lastState)
       }
@@ -155,24 +184,218 @@ export class Shell {
     const button = document.getElementById('start-match')
     if (button instanceof HTMLButtonElement) {
       button.disabled = !ready
-      button.textContent = ready ? 'Start match' : 'Loading arena…'
+      button.textContent = ready ? 'Fighters' : 'Loading…'
+    }
+    const title = document.getElementById('title-start')
+    if (title instanceof HTMLButtonElement) {
+      title.disabled = !ready
+      title.textContent = ready ? 'Press start' : 'Loading…'
+    }
+  }
+
+  private showScreen(screen: 'main' | 'setup' | 'characters' | 'arenas') {
+    this.screen = screen
+    if (screen === 'characters') {
+      this.renderRoster()
+    }
+    if (screen === 'arenas') {
+      this.renderArenas()
+    }
+    if (this.lastState) {
+      this.render(this.lastState)
+    }
+  }
+
+  private menuRoot(): HTMLElement | null {
+    if (this.settingsOpen()) {
+      return document.getElementById('settings-panel')
+    }
+    if (this.lastState?.status === 'paused') {
+      return document.getElementById('pause-menu')
+    }
+    if (this.lastState?.status === 'matchEnd') {
+      return document.getElementById('results-panel')
+    }
+    const id = this.screen === 'title'
+      ? 'title-screen'
+      : this.screen === 'main'
+        ? 'main-menu'
+        : this.screen === 'setup'
+          ? 'setup-menu'
+          : this.screen === 'arenas'
+            ? 'arena-select'
+            : ''
+    const element = id ? document.getElementById(id) : null
+    return element && !element.hidden ? element : null
+  }
+
+  private ensureFocus() {
+    const root = this.menuRoot()
+    if (!root || this.screen === 'characters') {
+      return
+    }
+    const enabled = focusItems(root).filter((item) => !item.disabled)
+    if (!enabled.some((item) => item.id === this.focusId)) {
+      const arenaId = this.arenas[this.arenaPick]?.id
+      const preferred = this.screen === 'arenas' && arenaId ? `arena-card-${arenaId}` : enabled[0]?.id
+      this.focusId = enabled.some((item) => item.id === preferred) ? preferred ?? null : enabled[0]?.id ?? null
+    }
+    paintFocus(root, this.focusId)
+  }
+
+  private shiftFocus(direction: FocusDirection) {
+    const root = this.menuRoot()
+    if (!root || this.listening) {
+      return
+    }
+    this.focusId = moveFocus(focusItems(root), this.focusId, direction)
+    this.syncArenaFromFocus()
+    paintFocus(root, this.focusId)
+  }
+
+  private syncArenaFromFocus() {
+    if (this.screen !== 'arenas' || !this.focusId?.startsWith('arena-card-')) {
+      return
+    }
+    const id = this.focusId.slice('arena-card-'.length)
+    const index = this.arenas.findIndex((arena) => arena.id === id)
+    if (index < 0 || index === this.arenaPick) {
+      return
+    }
+    this.arenaPick = index
+    this.renderArenas()
+  }
+
+  private moveMenuKey(event: KeyboardEvent) {
+    if (event.defaultPrevented || this.listening || this.screen === 'characters' || this.screen === 'title') {
+      return
+    }
+    if (event.target instanceof HTMLInputElement && event.target.type !== 'range') {
+      return
+    }
+    const direction: FocusDirection | null = event.code === 'ArrowUp'
+      ? 'up'
+      : event.code === 'ArrowDown'
+        ? 'down'
+        : event.code === 'ArrowLeft'
+          ? 'left'
+          : event.code === 'ArrowRight'
+            ? 'right'
+            : null
+    if (!direction) {
+      if ((event.code === 'Enter' || event.code === 'Space') && this.activateFocused()) {
+        event.preventDefault()
+      }
+      return
+    }
+    if (this.nudgeValue(direction)) {
+      event.preventDefault()
+      return
+    }
+    event.preventDefault()
+    this.shiftFocus(direction)
+  }
+
+  private nudgeValue(direction: FocusDirection): boolean {
+    if (direction !== 'left' && direction !== 'right') {
+      return false
+    }
+    const root = this.menuRoot()
+    const element = this.focusId && root ? root.querySelector(`#${CSS.escape(this.focusId)}`) : null
+    const delta = direction === 'right' ? 1 : -1
+    if (element instanceof HTMLSelectElement) {
+      const next = Math.min(element.options.length - 1, Math.max(0, element.selectedIndex + delta))
+      if (next !== element.selectedIndex) {
+        element.selectedIndex = next
+        element.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+      return true
+    }
+    if (element instanceof HTMLInputElement && element.type === 'range') {
+      const step = Number(element.step) || 0.05
+      const value = Math.min(Number(element.max), Math.max(Number(element.min), Number(element.value) + delta * step))
+      element.value = String(value)
+      element.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    }
+    return false
+  }
+
+  private activateFocused(): boolean {
+    const root = this.menuRoot()
+    const element = this.focusId && root ? root.querySelector(`#${CSS.escape(this.focusId)}`) : null
+    if (element instanceof HTMLButtonElement && !element.disabled) {
+      element.click()
+      return true
+    }
+    return false
+  }
+
+  private steerMenuPad(pads: PadSnapshot[]) {
+    const root = this.menuRoot()
+    if (this.listening || this.screen === 'title' || (!root && this.screen !== 'characters')) {
+      return
+    }
+    const pad = pads.find((item) => item.connected && item.index === 0) ?? pads.find((item) => item.connected)
+    const axisX = pad?.axes[0] ?? 0
+    const axisY = pad?.axes[1] ?? 0
+    const horizontal = pad?.buttons[14]?.pressed ? -1 : pad?.buttons[15]?.pressed ? 1 : axisX <= -0.6 ? -1 : axisX >= 0.6 ? 1 : 0
+    const vertical = pad?.buttons[12]?.pressed ? -1 : pad?.buttons[13]?.pressed ? 1 : axisY <= -0.6 ? -1 : axisY >= 0.6 ? 1 : 0
+    const direction: FocusDirection | null = vertical === -1 ? 'up' : vertical === 1 ? 'down' : horizontal === -1 ? 'left' : horizontal === 1 ? 'right' : null
+    if (direction && root && this.padNav.x === 0 && this.padNav.y === 0 && !this.nudgeValue(direction)) {
+      this.shiftFocus(direction)
+    }
+    this.padNav.x = horizontal
+    this.padNav.y = vertical
+    const a = Boolean(pad?.buttons[0]?.pressed)
+    const b = Boolean(pad?.buttons[1]?.pressed)
+    if (a && !this.padNav.a) {
+      if (this.screen === 'characters') {
+        document.getElementById('confirm-characters')?.click()
+      } else {
+        this.activateFocused()
+      }
+    }
+    if (b && !this.padNav.b) {
+      if (this.screen === 'characters') {
+        document.getElementById('characters-back')?.click()
+      } else {
+        const back = root?.querySelector('[data-back]')
+        if (back instanceof HTMLElement) {
+          back.click()
+        }
+      }
+    }
+    this.padNav.a = a
+    this.padNav.b = b
+  }
+
+  private confirmTitleKey(event: KeyboardEvent) {
+    if (this.screen !== 'title' || !this.ready || this.listening) {
+      return
+    }
+    if (event.code === 'Enter' || event.code === 'Space') {
+      event.preventDefault()
+      this.showScreen('main')
     }
   }
 
   render(state: DebugSnapshot) {
     this.lastState = state
     const settingsOpen = this.settingsOpen()
-    const choosing = state.status === 'menu' && this.screen === 'characters' && !settingsOpen
-    const pickingArena = state.status === 'menu' && this.screen === 'arenas' && !settingsOpen
-    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu' || settingsOpen || choosing || pickingArena
-    const roster = document.getElementById('character-select')
-    if (roster) {
-      roster.hidden = !choosing
+    const menu = state.status === 'menu' && !settingsOpen
+    this.setHidden('embers', state.status !== 'menu')
+    this.setHidden('title-screen', !(menu && this.screen === 'title'))
+    this.setHidden('main-menu', !(menu && this.screen === 'main'))
+    this.setHidden('setup-menu', !(menu && this.screen === 'setup'))
+    this.setHidden('character-select', !(menu && this.screen === 'characters'))
+    this.setHidden('arena-select', !(menu && this.screen === 'arenas'))
+    this.setHidden('results-panel', state.status !== 'matchEnd' || settingsOpen)
+    const results = document.getElementById('results-title')
+    if (results && state.status === 'matchEnd') {
+      results.textContent = state.banner ?? 'Match over'
     }
-    const arenas = document.getElementById('arena-select')
-    if (arenas) {
-      arenas.hidden = !pickingArena
-    }
+    this.ensureFocus()
     const pause = document.getElementById('pause-menu')
     if (pause) {
       pause.hidden = state.status !== 'paused' || settingsOpen
@@ -261,6 +484,7 @@ export class Shell {
       input.max = '1'
       input.step = '0.05'
       input.value = String(settings[key])
+      input.id = key
       input.dataset.testid = key
       input.addEventListener('input', () => {
         const current = settingsStore.get()
@@ -350,6 +574,7 @@ export class Shell {
   ): HTMLButtonElement {
     const button = document.createElement('button')
     button.type = 'button'
+    button.id = testId
     button.dataset.testid = testId
     const active = this.listening?.kind === kind
       && this.listening.slot === slot
@@ -376,6 +601,25 @@ export class Shell {
     }
     this.listening = null
     this.renderSettings()
+  }
+
+  private confirmTitlePad(pads: PadSnapshot[]) {
+    if (this.screen !== 'title') {
+      this.titleHeld = false
+      return
+    }
+    const pressed = pads.some((pad) => pad.connected && (pad.buttons[0]?.pressed || pad.buttons[9]?.pressed))
+    if (pressed && !this.titleHeld && this.ready) {
+      this.showScreen('main')
+    }
+    this.titleHeld = pressed
+  }
+
+  private setHidden(id: string, hidden: boolean) {
+    const element = document.getElementById(id)
+    if (element) {
+      element.hidden = hidden
+    }
   }
 
   private renderMoveList() {
@@ -415,6 +659,7 @@ export class Shell {
       const card = document.createElement('button')
       card.type = 'button'
       card.className = index === this.arenaPick ? 'roster-card selected' : 'roster-card'
+      card.id = `arena-card-${arena.id}`
       card.dataset.testid = `arena-card-${arena.id}`
       const mark = document.createElement('span')
       mark.className = 'mark'
@@ -471,7 +716,7 @@ export class Shell {
       this.roster.forEach((item, index) => {
         const card = document.createElement('button')
         card.type = 'button'
-        card.className = index === selected ? 'roster-card selected' : 'roster-card'
+        card.className = index === selected ? 'roster-card selected is-focused' : 'roster-card'
         card.dataset.testid = `character-card-${item.id}-${slot}`
         const mark = document.createElement('span')
         mark.className = 'mark'
@@ -528,6 +773,8 @@ export class Shell {
       const pads = readPads(this.host.pads())
       this.steerRosterPads(pads)
       this.steerArenaPads(pads)
+      this.confirmTitlePad(pads)
+      this.steerMenuPad(pads)
       if (this.listening?.kind === 'pad' && this.listening.slot !== 'menu') {
         for (const pad of pads) {
           if (!pad || this.listening?.kind !== 'pad' || this.listening.slot === 'menu') {

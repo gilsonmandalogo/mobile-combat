@@ -1,4 +1,4 @@
-export type CueName = 'menu' | 'attack' | 'hit' | 'block' | 'ko' | 'round' | 'win'
+export type CueName = 'menu' | 'hover' | 'attack' | 'hit' | 'block' | 'ko' | 'round' | 'win'
 
 export interface Tone {
   frequency: number
@@ -25,6 +25,8 @@ export function cueTones(name: CueName): Tone[] {
   switch (name) {
   case 'menu':
     return [tone(660, 0.06, 'square', 0.25, 880)]
+  case 'hover':
+    return [tone(880, 0.035, 'sine', 0.08, 990)]
   case 'attack':
     return [tone(220, 0.09, 'sawtooth', 0.35, 90)]
   case 'hit':

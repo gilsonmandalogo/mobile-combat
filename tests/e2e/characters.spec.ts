@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 
 test('players pick distinct characters with the keyboard and a gamepad', async ({ page }) => {
   await page.goto('/mobile-combat/?debug=1')
+  await page.getByTestId('title-start').click()
+  await page.getByTestId('main-fight').click()
   await expect(page.getByTestId('start-match')).toBeEnabled()
   await page.getByTestId('start-match').click()
   await expect(page.getByTestId('character-select')).toBeVisible()

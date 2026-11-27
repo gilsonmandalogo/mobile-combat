@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test'
 test('keyboard bindings can be remapped, persisted, and reset', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('/mobile-combat/?debug=1')
-  await expect(page.getByTestId('start-match')).toBeEnabled()
+  await page.getByTestId('title-start').click()
+  await expect(page.getByTestId('open-settings')).toBeVisible()
   await page.getByTestId('open-settings').click()
   await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyA')
 
@@ -25,6 +26,7 @@ test('keyboard bindings can be remapped, persisted, and reset', async ({ page })
   await page.keyboard.press('KeyQ')
   await expect(page.getByTestId('bind-player1-left')).toHaveText('KeyQ')
   await page.getByTestId('close-settings').click()
+  await page.getByTestId('main-fight').click()
   await page.getByTestId('start-match').click()
   await page.getByTestId('confirm-characters').click()
   await page.getByTestId('confirm-arena').click()
