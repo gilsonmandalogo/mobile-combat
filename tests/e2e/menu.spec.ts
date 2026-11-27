@@ -16,6 +16,7 @@ test('the main menu starts a versus-AI match with the chosen name', async ({ pag
   await start.click()
   await expect(page.getByTestId('character-select')).toBeVisible()
   await page.getByTestId('confirm-characters').click()
+  await page.getByTestId('confirm-arena').click()
 
   await expect(page.getByTestId('main-menu')).toBeHidden()
   await page.waitForFunction(() => {

@@ -1,0 +1,14 @@
+{
+  "id": "mayan-temple",
+  "name": "Mayan Temple",
+  "preview": { "color": "#c9863a", "mark": "T" },
+  "environment": {
+    "kind": "glb",
+    "file": "assets/models/Mayan-Temple.glb",
+    "background": "#07060a",
+    "license": "Existing project model shipped with Mobile Combat."
+  },
+  "bounds": { "minX": -6, "maxX": 6 },
+  "spawns": [-3.6, 3.6],
+  "music": "temple"
+}

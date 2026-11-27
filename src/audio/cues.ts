@@ -8,7 +8,11 @@ export interface Tone {
   slide: number
 }
 
-const SCALE = [196, 220, 247, 262, 294, 247, 220, 196]
+const SCALES: Record<string, number[]> = {
+  temple: [196, 220, 247, 262, 294, 247, 220, 196],
+  pit: [110, 131, 147, 165, 147, 131, 110, 98],
+  court: [262, 311, 349, 392, 349, 311, 262, 233],
+}
 
 export function clampGain(volume: number): number {
   if (!Number.isFinite(volume)) {
@@ -36,9 +40,10 @@ export function cueTones(name: CueName): Tone[] {
   }
 }
 
-export function musicNote(step: number): Tone {
-  const index = ((Math.floor(step) % SCALE.length) + SCALE.length) % SCALE.length
-  return tone(SCALE[index], 0.32, 'triangle', 0.18, SCALE[index])
+export function musicNote(step: number, theme = 'temple'): Tone {
+  const scale = SCALES[theme] ?? SCALES.temple
+  const index = ((Math.floor(step) % scale.length) + scale.length) % scale.length
+  return tone(scale[index], 0.32, 'triangle', 0.18, scale[index])
 }
 
 function tone(

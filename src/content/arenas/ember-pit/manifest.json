@@ -1,0 +1,19 @@
+{
+  "id": "ember-pit",
+  "name": "Ember Pit",
+  "preview": { "color": "#ff6a1a", "mark": "E" },
+  "environment": {
+    "kind": "primitive",
+    "background": "#140806",
+    "fog": "#2a100c",
+    "floor": "#3a1c16",
+    "accent": "#ff6a1a",
+    "ambient": "#ffb089",
+    "ambientIntensity": 0.35,
+    "sun": { "color": "#ffb15a", "intensity": 1.35, "position": [-2, 7, 3] },
+    "license": "Original procedural arena, MIT, no third-party mesh."
+  },
+  "bounds": { "minX": -4.5, "maxX": 4.5 },
+  "spawns": [-2.4, 2.4],
+  "music": "pit"
+}

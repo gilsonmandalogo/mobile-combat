@@ -16,6 +16,7 @@ describe('synthesized audio', () => {
       }
     }
     expect(musicNote(0).frequency).toBe(musicNote(8).frequency)
+    expect(musicNote(0, 'pit').frequency).not.toBe(musicNote(0, 'temple').frequency)
     expect(musicNote(-1).frequency).toBe(musicNote(7).frequency)
   })
 

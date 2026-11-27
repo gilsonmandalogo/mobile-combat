@@ -6,7 +6,6 @@ export default defineConfig({
     alias: {
       '@src': path.resolve(__dirname, 'src'),
       '@stores': path.resolve(__dirname, 'src/stores'),
-      '@levels': path.resolve(__dirname, 'src/levels'),
       '@particles': path.resolve(__dirname, 'src/particles'),
     },
   },

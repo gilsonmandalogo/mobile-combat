@@ -7,7 +7,6 @@
     "paths": {
       "@src/*": ["src/*"],
       "@stores/*": ["src/stores/*"],
-      "@levels/*": ["src/levels/*"],
       "@particles/*": ["src/particles/*"],
     }
   },

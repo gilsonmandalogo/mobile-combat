@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { characterById, defaultPicks, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
+import { arenaById, characterById, defaultArena, defaultPicks, loadArenas, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import { CatalogError } from '@src/content/schema'
 
 describe('character catalog', () => {
@@ -55,5 +55,38 @@ describe('character catalog', () => {
     expect(effects.sort()).toEqual(['dash', 'projectile', 'teleport', 'uppercut'])
     expect(moveList(characterById('colin'))).toContain('Ember — back, forward, punch')
     expect(moveList(characterById('brute'))).toContain('Riser — forward, up, punch')
+  })
+})
+
+describe('arena catalog', () => {
+  it('discovers three stages and rejects a spawn outside the bounds', () => {
+    const arenas = loadArenas()
+    expect(arenas.map((arena) => arena.id).sort()).toEqual(['ember-pit', 'mayan-temple', 'moon-court'])
+    expect(arenaById('ember-pit').environment.kind).toBe('primitive')
+    expect(arenaById('mayan-temple').environment.kind).toBe('glb')
+    expect(defaultArena(arenas)).toBe(arenas.findIndex((arena) => arena.id === 'mayan-temple'))
+    expect(arenaById('moon-court').bounds.maxX).toBeGreaterThan(arenaById('mayan-temple').bounds.maxX)
+
+    expect(() => loadArenas({
+      '/src/content/arenas/void/manifest.json': {
+        id: 'void',
+        name: 'Void',
+        preview: { color: '#112233', mark: 'V' },
+        environment: {
+          kind: 'primitive',
+          background: '#000000',
+          fog: '#111111',
+          floor: '#222222',
+          accent: '#333333',
+          ambient: '#444444',
+          ambientIntensity: 0.2,
+          sun: { color: '#ffffff', intensity: 1, position: [0, 5, 0] },
+          license: 'test',
+        },
+        bounds: { minX: -2, maxX: 2 },
+        spawns: [-4, 4],
+        music: 'pit',
+      },
+    })).toThrow(/spawns must sit inside bounds/)
   })
 })

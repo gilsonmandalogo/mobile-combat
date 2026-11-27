@@ -71,8 +71,19 @@ import '@src/styles.css'
           </div>
         </div>
         <div class="menu-actions">
-          <button id="confirm-characters" data-testid="confirm-characters" type="button">Fight</button>
+          <button id="confirm-characters" data-testid="confirm-characters" type="button">Arenas</button>
           <button id="characters-back" data-testid="characters-back" type="button">Back</button>
+        </div>
+      </section>
+      <section id="arena-select" class="panel" data-testid="arena-select" hidden>
+        <p class="eyebrow">Stage</p>
+        <h2>Choose an arena</h2>
+        <p class="tagline">A and D, the arrow keys, or a stick cycle the stages.</p>
+        <p data-testid="arena-name" class="pick-name"></p>
+        <div id="arena-list" class="roster" data-testid="arena-list"></div>
+        <div class="menu-actions">
+          <button id="confirm-arena" data-testid="confirm-arena" type="button">Fight</button>
+          <button id="arenas-back" data-testid="arenas-back" type="button">Back</button>
         </div>
       </section>
       <section id="pause-menu" class="panel" data-testid="pause-menu" hidden>

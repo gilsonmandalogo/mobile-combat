@@ -1,0 +1,19 @@
+{
+  "id": "moon-court",
+  "name": "Moon Court",
+  "preview": { "color": "#9eb6d8", "mark": "M" },
+  "environment": {
+    "kind": "primitive",
+    "background": "#070b16",
+    "fog": "#1a2740",
+    "floor": "#1c2838",
+    "accent": "#d5e4ff",
+    "ambient": "#b9c8e6",
+    "ambientIntensity": 0.55,
+    "sun": { "color": "#d5e4ff", "intensity": 1.15, "position": [3, 9, 2] },
+    "license": "Original procedural arena, MIT, no third-party mesh."
+  },
+  "bounds": { "minX": -8, "maxX": 8 },
+  "spawns": [-4.2, 4.2],
+  "music": "court"
+}

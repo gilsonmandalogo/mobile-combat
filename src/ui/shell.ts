@@ -5,7 +5,7 @@ import { buttonName } from '@src/input/gamepad'
 import type { PadBindings } from '@src/input/gamepad'
 import { deviceValue, readMatchSetup } from '@src/ui/setup'
 import { hudView } from '@src/ui/hud'
-import { defaultPicks, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
+import { defaultArena, defaultPicks, loadArenas, loadCharacters, moveList, stepRoster } from '@src/content/catalog'
 import type { Difficulty, MatchMode } from '@src/sim/types'
 import type { PadSnapshot } from '@src/input/gamepad'
 
@@ -27,7 +27,7 @@ interface Listening {
 }
 
 export interface MatchHost {
-  beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string] }) => void | Promise<void>
+  beginMatch: (options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string]; arena?: string }) => void | Promise<void>
   resume: () => void
   restart: () => void
   quitToMenu: () => void
@@ -38,10 +38,13 @@ export class Shell {
   private ready = false
   private lastState: DebugSnapshot | null = null
   private listening: Listening | null = null
-  private screen: 'main' | 'characters' = 'main'
+  private screen: 'main' | 'characters' | 'arenas' = 'main'
   private roster = loadCharacters()
   private picks = defaultPicks(this.roster)
   private rosterAxis = [0, 0]
+  private arenas = loadArenas()
+  private arenaPick = defaultArena(this.arenas)
+  private arenaAxis = 0
 
   constructor(private host: MatchHost) {}
 
@@ -72,6 +75,7 @@ export class Shell {
     })
     window.addEventListener('keydown', (event) => this.captureKey(event), true)
     window.addEventListener('keydown', (event) => this.steerCharacters(event))
+    window.addEventListener('keydown', (event) => this.steerArenas(event))
     this.watchPads()
 
     this.required<HTMLButtonElement>('start-match').addEventListener('click', () => {
@@ -103,11 +107,41 @@ export class Shell {
         device2: this.required<HTMLSelectElement>('device2').value,
       })
       this.persistSetup(setup)
+      this.screen = 'arenas'
+      this.renderArenas()
+      if (this.lastState) {
+        this.render(this.lastState)
+      }
+    })
+    this.bindClick('arenas-back', () => {
+      this.screen = 'characters'
+      this.renderRoster()
+      if (this.lastState) {
+        this.render(this.lastState)
+      }
+    })
+    this.bindClick('confirm-arena', () => {
+      if (!this.ready) {
+        return
+      }
+      const setup = readMatchSetup({
+        mode: mode.value,
+        difficulty: this.required<HTMLSelectElement>('difficulty').value,
+        name1: this.required<HTMLInputElement>('name1').value,
+        name2: this.required<HTMLInputElement>('name2').value,
+        device1: this.required<HTMLSelectElement>('device1').value,
+        device2: this.required<HTMLSelectElement>('device2').value,
+      })
       const ids: [string, string] = [
         this.roster[this.picks.player1].id,
         this.roster[this.picks.player2].id,
       ]
-      void this.host.beginMatch({ mode: setup.mode, difficulty: setup.difficulty, characters: ids })
+      void this.host.beginMatch({
+        mode: setup.mode,
+        difficulty: setup.difficulty,
+        characters: ids,
+        arena: this.arenas[this.arenaPick].id,
+      })
     })
 
     window.addEventListener('gamepadconnected', () => this.refreshPads())
@@ -129,10 +163,15 @@ export class Shell {
     this.lastState = state
     const settingsOpen = this.settingsOpen()
     const choosing = state.status === 'menu' && this.screen === 'characters' && !settingsOpen
-    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu' || settingsOpen || choosing
+    const pickingArena = state.status === 'menu' && this.screen === 'arenas' && !settingsOpen
+    this.required<HTMLElement>('main-menu').hidden = state.status !== 'menu' || settingsOpen || choosing || pickingArena
     const roster = document.getElementById('character-select')
     if (roster) {
       roster.hidden = !choosing
+    }
+    const arenas = document.getElementById('arena-select')
+    if (arenas) {
+      arenas.hidden = !pickingArena
     }
     const pause = document.getElementById('pause-menu')
     if (pause) {
@@ -364,6 +403,61 @@ export class Shell {
     }
   }
 
+  private renderArenas() {
+    const selected = this.arenas[this.arenaPick]
+    this.text('arena-name', selected ? `${selected.name} · ${selected.music}` : '')
+    const list = document.getElementById('arena-list')
+    if (!list) {
+      return
+    }
+    list.replaceChildren()
+    this.arenas.forEach((arena, index) => {
+      const card = document.createElement('button')
+      card.type = 'button'
+      card.className = index === this.arenaPick ? 'roster-card selected' : 'roster-card'
+      card.dataset.testid = `arena-card-${arena.id}`
+      const mark = document.createElement('span')
+      mark.className = 'mark'
+      mark.style.background = arena.preview.color
+      mark.textContent = arena.preview.mark
+      const label = document.createElement('span')
+      label.textContent = arena.name
+      card.append(mark, label)
+      card.addEventListener('click', () => {
+        this.arenaPick = index
+        this.renderArenas()
+      })
+      list.append(card)
+    })
+  }
+
+  private steerArenas(event: KeyboardEvent) {
+    if (this.screen !== 'arenas' || this.listening) {
+      return
+    }
+    if (event.code !== 'KeyA' && event.code !== 'KeyD' && event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') {
+      return
+    }
+    event.preventDefault()
+    const delta = event.code === 'KeyD' || event.code === 'ArrowRight' ? 1 : -1
+    this.arenaPick = stepRoster(this.arenaPick, delta, this.arenas.length)
+    this.renderArenas()
+  }
+
+  private steerArenaPads(pads: PadSnapshot[]) {
+    if (this.screen !== 'arenas') {
+      return
+    }
+    const pad = pads.find((item) => item.connected && (item.index === 0 || item.index === 1))
+    const axis = pad?.axes[0] ?? 0
+    const direction = pad?.buttons[14]?.pressed ? -1 : pad?.buttons[15]?.pressed ? 1 : axis <= -0.6 ? -1 : axis >= 0.6 ? 1 : 0
+    if (direction !== 0 && this.arenaAxis === 0) {
+      this.arenaPick = stepRoster(this.arenaPick, direction, this.arenas.length)
+      this.renderArenas()
+    }
+    this.arenaAxis = direction
+  }
+
   private renderRoster() {
     for (const slot of ['player1', 'player2'] as const) {
       const selected = this.picks[slot]
@@ -433,6 +527,7 @@ export class Shell {
     const tick = () => {
       const pads = readPads(this.host.pads())
       this.steerRosterPads(pads)
+      this.steerArenaPads(pads)
       if (this.listening?.kind === 'pad' && this.listening.slot !== 'menu') {
         for (const pad of pads) {
           if (!pad || this.listening?.kind !== 'pad' || this.listening.slot === 'menu') {

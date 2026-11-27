@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import Player from '@src/player'
 import Animations from '@src/animations'
-import { characterById } from '@src/content/catalog'
+import { arenaById, characterById } from '@src/content/catalog'
 import type { CharacterDef } from '@src/content/schema'
 import { updateDebug } from '@src/debug'
 import { settingsStore } from '@stores/settings'
@@ -24,7 +24,7 @@ import type { PlayerSlot } from '@src/settings/schema'
 
 interface GameConstructor {
   roundTime: number
-  enterArena: () => Promise<void>
+  enterArena: (arenaId: string) => Promise<void>
 }
 
 export default class Game {
@@ -32,7 +32,7 @@ export default class Game {
   private player2?: Player
   private animations?: Animations
   private loadedIds: [string, string] | null = null
-  private enterArena: () => Promise<void>
+  private enterArena: (arenaId: string) => Promise<void>
   private match: MatchState
   private keyboard: KeyboardTracker
   private forced: Record<FighterId, Intent | null> = { player1: null, player2: null }
@@ -89,6 +89,7 @@ export default class Game {
         difficulty,
         seed: Number.isFinite(seed) && seed > 0 ? Math.floor(seed) : 1,
         characters: ids,
+        arena: params.get('arena') ?? 'mayan-temple',
       })
     } else {
       this.present(false, 0)
@@ -106,11 +107,13 @@ export default class Game {
     return this.connectedPads
   }
 
-  public async beginMatch(options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string] }) {
+  public async beginMatch(options: { mode: MatchMode; difficulty: Difficulty; seed?: number; characters?: [string, string]; arena?: string }) {
     const settings = settingsStore.get()
     const ids = options.characters ?? ['colin', 'colin']
+    const arena = arenaById(options.arena ?? 'mayan-temple')
     await this.prepareFighters(ids)
-    await this.enterArena()
+    await this.enterArena(arena.id)
+    this.audio.setTheme(arena.music)
     const secondDevice = options.mode === 'ai'
       ? 'ai'
       : settings.players.player2.device === 'gamepad' ? 'gamepad' : 'keyboard'
@@ -128,6 +131,12 @@ export default class Game {
       ],
       seed: options.seed ?? 1,
       profiles: [profileFrom(characterById(ids[0])), profileFrom(characterById(ids[1]))],
+      arenaId: arena.id,
+      arena: {
+        minX: arena.bounds.minX,
+        maxX: arena.bounds.maxX,
+        spawns: [arena.spawns[0], arena.spawns[1]],
+      },
     })).state
     this.present(false, 0)
   }

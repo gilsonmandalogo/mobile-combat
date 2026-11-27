@@ -1,13 +1,35 @@
-import { CatalogError, characterSchema, folderId, formatIssues } from '@src/content/schema'
-import type { CharacterDef } from '@src/content/schema'
+import { CatalogError, arenaSchema, characterSchema, folderId, formatIssues } from '@src/content/schema'
+import type { ArenaDef, CharacterDef } from '@src/content/schema'
 
 const characterModules = import.meta.glob('./characters/*/manifest.json', {
   eager: true,
   import: 'default',
 }) as Record<string, unknown>
 
+const arenaModules = import.meta.glob('./arenas/*/manifest.json', {
+  eager: true,
+  import: 'default',
+}) as Record<string, unknown>
+
 export function loadCharacters(modules: Record<string, unknown> = characterModules): CharacterDef[] {
   return loadGroup(modules, characterSchema, 'character')
+}
+
+export function loadArenas(modules: Record<string, unknown> = arenaModules): ArenaDef[] {
+  return loadGroup(modules, arenaSchema, 'arena')
+}
+
+export function arenaById(id: string): ArenaDef {
+  const found = loadArenas().find((arena) => arena.id === id)
+  if (!found) {
+    throw new CatalogError([`No arena "${id}" in the catalog.`])
+  }
+  return found
+}
+
+export function defaultArena(arenas: Array<{ id: string }>): number {
+  const index = arenas.findIndex((arena) => arena.id === 'mayan-temple')
+  return index >= 0 ? index : 0
 }
 
 export function characterById(id: string): CharacterDef {

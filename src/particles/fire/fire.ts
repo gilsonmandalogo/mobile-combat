@@ -185,6 +185,12 @@ export default class FireParticleSystem {
     this.updateParticles(timeElapsed)
     this.updateGeometry()
   }
+
+  public dispose() {
+    this.geometry.dispose()
+    this.material.dispose()
+    this.points.removeFromParent()
+  }
 }
 
 type Lerp<T> = (a: number, b: T, c: T) => T

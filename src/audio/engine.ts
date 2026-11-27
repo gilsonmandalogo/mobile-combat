@@ -26,6 +26,7 @@ export class AudioEngine {
   private sfxVolume = 0.7
   private musicClock = 0
   private musicStep = 0
+  private theme = 'temple'
 
   constructor(private readonly createContext: () => ToneContext | null = defaultContext) {}
 
@@ -47,6 +48,13 @@ export class AudioEngine {
     this.music = enabled
   }
 
+  setTheme(theme: string) {
+    if (theme !== this.theme) {
+      this.theme = theme
+      this.musicStep = 0
+    }
+  }
+
   play(cue: CueName) {
     this.lastCue = cue
     this.voice(cueTones(cue), this.sfxVolume)
@@ -60,7 +68,7 @@ export class AudioEngine {
     const spacing = 0.34
     while (this.musicClock >= spacing) {
       this.musicClock -= spacing
-      this.voice([musicNote(this.musicStep)], this.musicVolume * 0.55)
+      this.voice([musicNote(this.musicStep, this.theme)], this.musicVolume * 0.55)
       this.musicStep += 1
     }
   }

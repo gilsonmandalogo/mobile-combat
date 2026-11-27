@@ -38,6 +38,7 @@ test('players pick distinct characters with the keyboard and a gamepad', async (
   })
   await expect(page.getByTestId('pick-name-player2')).toHaveText(/Colin Cole/)
   await page.getByTestId('confirm-characters').click()
+  await page.getByTestId('confirm-arena').click()
 
   await page.waitForFunction(() => {
     const api = (window as unknown as {

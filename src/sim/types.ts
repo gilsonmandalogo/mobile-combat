@@ -1,3 +1,5 @@
+import type { ArenaBounds } from '@src/sim/constants'
+
 export type FighterId = 'player1' | 'player2'
 export type Action = 'idle' | 'walk' | 'jump' | 'attackUp' | 'attackDown' | 'special' | 'block' | 'hitstun' | 'ko'
 export type InputToken = 'back' | 'forward' | 'up' | 'punch' | 'kick'
@@ -70,6 +72,8 @@ export interface MatchState {
   seed: number
   projectiles: ProjectileState[]
   motions: Record<FighterId, MotionMemory>
+  arenaId: string
+  arena: ArenaBounds
 }
 
 export interface Aabb {
@@ -95,6 +99,8 @@ export interface MatchOptions {
   devices: [DeviceKind, DeviceKind]
   seed: number
   profiles?: [FighterProfile, FighterProfile]
+  arenaId?: string
+  arena?: ArenaBounds
 }
 
 export interface FighterProfile {

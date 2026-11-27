@@ -66,6 +66,57 @@ export const characterSchema = z.object({
   combos: z.array(comboSchema).default([]),
 })
 
+const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'must be a #rrggbb color')
+
+const sunSchema = z.object({
+  color: colorSchema,
+  intensity: z.number().nonnegative().max(8),
+  position: z.tuple([z.number(), z.number(), z.number()]),
+})
+
+const glbEnvironmentSchema = z.object({
+  kind: z.literal('glb'),
+  file: z.string().min(1),
+  background: colorSchema,
+  license: z.string().min(1),
+})
+
+const primitiveEnvironmentSchema = z.object({
+  kind: z.literal('primitive'),
+  background: colorSchema,
+  fog: colorSchema,
+  floor: colorSchema,
+  accent: colorSchema,
+  ambient: colorSchema,
+  ambientIntensity: z.number().nonnegative().max(4),
+  sun: sunSchema,
+  license: z.string().min(1),
+})
+
+export const arenaSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/, 'must be a lowercase id'),
+  name: z.string().min(1).max(32),
+  preview: portraitSchema,
+  environment: z.discriminatedUnion('kind', [glbEnvironmentSchema, primitiveEnvironmentSchema]),
+  bounds: z.object({
+    minX: z.number(),
+    maxX: z.number(),
+  }),
+  spawns: z.tuple([z.number(), z.number()]),
+  music: z.enum(['temple', 'pit', 'court']),
+}).superRefine((arena, ctx) => {
+  if (arena.bounds.maxX <= arena.bounds.minX) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bounds'], message: 'maxX must be greater than minX' })
+  }
+  for (const spawn of arena.spawns) {
+    if (spawn < arena.bounds.minX || spawn > arena.bounds.maxX) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['spawns'], message: 'spawns must sit inside bounds' })
+      break
+    }
+  }
+})
+
+export type ArenaDef = z.infer<typeof arenaSchema>
 export type CharacterDef = z.infer<typeof characterSchema>
 export type ComboDef = z.infer<typeof comboSchema>
 export type InputToken = z.infer<typeof tokenSchema>

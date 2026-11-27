@@ -17,6 +17,18 @@ export const HURT_HALF_W = 0.36
 export const HURT_HEIGHT = 1.72
 export const SPAWN_X = 3.6
 
+export interface ArenaBounds {
+  minX: number
+  maxX: number
+  spawns: [number, number]
+}
+
+export const DEFAULT_ARENA: ArenaBounds = {
+  minX: STAGE_MIN_X,
+  maxX: STAGE_MAX_X,
+  spawns: [-SPAWN_X, SPAWN_X],
+}
+
 export interface AttackSpec {
   damage: number
   knockback: number

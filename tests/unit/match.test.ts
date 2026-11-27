@@ -211,6 +211,40 @@ describe('match simulation', () => {
     expect(restarted.fighters[0].speed).toBe(6)
     expect(restarted.fighters[1].maxLife).toBe(130)
   })
+
+  it('keeps fighters inside the selected arena', () => {
+    const started = startMatch(createMatch({
+      mode: 'local',
+      difficulty: 'normal',
+      roundTime: 20,
+      names: ['Red', 'Blue'],
+      devices: ['keyboard', 'keyboard'],
+      seed: 1,
+      arenaId: 'moon-court',
+      arena: { minX: -8, maxX: 8, spawns: [-4.2, 4.2] },
+    }))
+    expect(started.state.fighters[0].x).toBeCloseTo(-4.2)
+    const open = place({ ...started.state, introTime: 0, banner: null }, -4.2, 7.6)
+    const walked = stepSeconds(open, both({ move: 1 }), 3.2)
+    expect(walked.state.fighters[0].x).toBeGreaterThan(6)
+    expect(walked.state.fighters[0].x).toBeLessThanOrEqual(8)
+    const restarted = restartMatch(walked.state)
+    expect(restarted.arenaId).toBe('moon-court')
+    expect(restarted.fighters[0].x).toBeCloseTo(-4.2)
+
+    const tight = startMatch(createMatch({
+      mode: 'local',
+      difficulty: 'normal',
+      roundTime: 20,
+      names: ['Red', 'Blue'],
+      devices: ['keyboard', 'keyboard'],
+      seed: 1,
+      arenaId: 'ember-pit',
+      arena: { minX: -3, maxX: 3, spawns: [-1, 1] },
+    }))
+    const walled = stepSeconds(place({ ...tight.state, introTime: 0, banner: null }, 2.8, 1), both({ move: 1 }), 0.4)
+    expect(walled.state.fighters[0].x).toBeLessThanOrEqual(3)
+  })
 })
 
 function rosterFight(leftId: string, rightId: string): MatchState {

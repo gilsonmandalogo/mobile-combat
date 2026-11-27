@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
+import { arenaById } from '@src/content/catalog'
 import Game from '@src/game'
 import { Shell } from '@src/ui/shell'
 import { contextStore } from '@stores/context'
-import MayanTempleLevel from '@levels/mayanTemple'
+import { mountArena } from '@src/view/arena'
+import type { ArenaView } from '@src/view/arena'
 
 const scene = new THREE.Scene()
 scene.background = new THREE.Color('#07060a')
@@ -18,35 +20,32 @@ renderer.domElement.tabIndex = 0
 renderer.domElement.dataset.testid = 'game-canvas'
 document.body.appendChild(renderer.domElement)
 
-let camera: THREE.PerspectiveCamera = new THREE.PerspectiveCamera(
+const fallbackCamera = new THREE.PerspectiveCamera(
   42,
   window.innerWidth / window.innerHeight,
   0.1,
   200,
 )
-camera.position.set(0, 2.2, 8.5)
-camera.lookAt(0, 1.1, 0)
+fallbackCamera.position.set(0, 2.4, 9.2)
+fallbackCamera.lookAt(0, 1.1, 0)
+let camera: THREE.PerspectiveCamera = fallbackCamera
+let arenaView: ArenaView | null = null
 
-let levelController: MayanTempleLevel | null = null
-let arenaPromise: Promise<void> | null = null
-
-function enterArena(): Promise<void> {
-  if (!arenaPromise) {
-    arenaPromise = mountTemple()
+async function enterArena(id: string): Promise<void> {
+  const def = arenaById(id)
+  arenaView?.dispose()
+  arenaView = await mountArena(def, scene)
+  if (arenaView.camera) {
+    arenaView.camera.aspect = window.innerWidth / window.innerHeight
+    arenaView.camera.updateProjectionMatrix()
+    camera = arenaView.camera
+    return
   }
-  return arenaPromise
-}
-
-async function mountTemple() {
-  levelController = new MayanTempleLevel()
-  const model = await levelController.loadLevel()
-  scene.add(model.scene)
-  const embedded = model.cameras[0]
-  if (embedded instanceof THREE.PerspectiveCamera) {
-    embedded.aspect = window.innerWidth / window.innerHeight
-    embedded.updateProjectionMatrix()
-    camera = embedded
-  }
+  fallbackCamera.aspect = window.innerWidth / window.innerHeight
+  fallbackCamera.position.set(0, 2.4, 9.2)
+  fallbackCamera.lookAt(0, 1.1, 0)
+  fallbackCamera.updateProjectionMatrix()
+  camera = fallbackCamera
 }
 
 const gameController = new Game({
@@ -78,7 +77,7 @@ function animate() {
 
   controls.update()
   gameController.update(delta)
-  levelController?.update(delta)
+  arenaView?.update(delta)
 
   render()
 }
