@@ -1,21 +1,45 @@
-import { ATTACKS, HURT_HALF_W, HURT_HEIGHT } from '@src/sim/constants'
+import { CROUCH_HURT_HEIGHT, HURT_HALF_W, HURT_HEIGHT } from '@src/sim/constants'
 import type { AttackSpec } from '@src/sim/constants'
-import type { Aabb, FighterState } from '@src/sim/types'
+import type { Aabb, FighterState, HitLevel } from '@src/sim/types'
 
 export type AttackPhase = 'startup' | 'active' | 'recovery'
 
+const STRIKES = new Set<FighterState['action']>(['attackUp', 'attackDown', 'crouchPunch', 'crouchKick', 'special'])
+
 export function isAttack(action: FighterState['action']): boolean {
-  return action === 'attackUp' || action === 'attackDown' || action === 'special'
+  return STRIKES.has(action)
 }
 
 export function attackSpec(fighter: FighterState): AttackSpec | null {
-  if (fighter.action === 'attackUp' || fighter.action === 'attackDown') {
-    return ATTACKS[fighter.action]
+  if (fighter.action === 'attackUp' || fighter.action === 'attackDown' || fighter.action === 'crouchPunch' || fighter.action === 'crouchKick') {
+    return fighter.attacks[fighter.action]
   }
   if (fighter.action === 'special' && fighter.special && fighter.special.effect !== 'projectile') {
     return fighter.special
   }
   return null
+}
+
+export function hitLevelOf(fighter: FighterState): HitLevel {
+  if (fighter.y > 0.25) {
+    return 'overhead'
+  }
+  return attackSpec(fighter)?.hitLevel ?? 'mid'
+}
+
+export function blocksStrike(defender: FighterState, level: HitLevel, sourceX: number): boolean {
+  const faces = (defender.facing === 1 && sourceX >= defender.x)
+    || (defender.facing === -1 && sourceX <= defender.x)
+  if (!defender.blocking || !faces || defender.y >= 0.35) {
+    return false
+  }
+  if (level === 'low') {
+    return defender.crouching
+  }
+  if (level === 'high' || level === 'overhead') {
+    return !defender.crouching
+  }
+  return true
 }
 
 export function attackPhase(fighter: FighterState): AttackPhase | null {
@@ -40,11 +64,12 @@ export function overlaps(a: Aabb, b: Aabb): boolean {
 }
 
 export function hurtbox(fighter: FighterState): Aabb {
+  const height = fighter.crouching ? CROUCH_HURT_HEIGHT : HURT_HEIGHT
   return {
     minX: fighter.x - HURT_HALF_W,
     maxX: fighter.x + HURT_HALF_W,
     minY: fighter.y,
-    maxY: fighter.y + HURT_HEIGHT,
+    maxY: fighter.y + height,
   }
 }
 

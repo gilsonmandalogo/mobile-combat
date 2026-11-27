@@ -1,9 +1,9 @@
-import { ATTACKS, BLOCK_CHIP, BLOCK_PUSH, BLOCK_STUN_MIN, BLOCK_STUN_SCALE, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_SPEED, KNOCKBACK_DECAY, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, attackDuration } from '@src/sim/constants'
+import { BLOCK_CHIP, BLOCK_PUSH, BLOCK_STUN_MIN, BLOCK_STUN_SCALE, DEFAULT_ARENA, GRAVITY, INTRO_TIME, JUMP_SPEED, KNOCKBACK_DECAY, MAX_LIFE, MAX_ROUNDS, MOVE_SPEED, PUSH_DISTANCE, ROUND_END_DELAY, ROUNDS_TO_WIN, attackDuration, defaultAttackBook } from '@src/sim/constants'
 import type { ArenaBounds } from '@src/sim/constants'
 import { bestCombo, emptyMotion, holdsJump, pushMotion } from '@src/sim/buffer'
-import { attackPhase, attackSpec, hitbox, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
+import { attackPhase, attackSpec, blocksStrike, hitbox, hitLevelOf, hurtbox, isAttack, overlaps } from '@src/sim/hitboxes'
 import { EMPTY_INTENT } from '@src/sim/types'
-import type { ActiveSpecial, ComboSpec, FighterId, FighterProfile, FighterState, GameEvent, Intent, MatchOptions, MatchState, ProjectileState } from '@src/sim/types'
+import type { ActiveSpecial, AttackName, ComboSpec, FighterId, FighterProfile, FighterState, GameEvent, Intent, MatchOptions, MatchState, ProjectileState } from '@src/sim/types'
 
 export interface StepResult {
   state: MatchState
@@ -42,6 +42,7 @@ export function createFighter(
     action: 'idle',
     actionTime: 0,
     blocking: false,
+    crouching: false,
     blockstun: 0,
     hitstun: 0,
     invuln: 0,
@@ -53,6 +54,7 @@ export function createFighter(
     damageScale: profile.damageScale ?? 1,
     chips: profile.chips ?? { attackUp: BLOCK_CHIP, attackDown: BLOCK_CHIP },
     combos: profile.combos ?? [],
+    attacks: profile.attacks ?? defaultAttackBook(),
     special: null,
   }
 }
@@ -122,6 +124,7 @@ function profileOf(fighter: FighterState): FighterProfile {
     damageScale: fighter.damageScale,
     chips: fighter.chips,
     combos: fighter.combos,
+    attacks: fighter.attacks,
   }
 }
 
@@ -173,8 +176,8 @@ function strikeChip(attacker: FighterState): number {
   if (attacker.action === 'special') {
     return chipRatio(attacker.special?.chip)
   }
-  if (attacker.action === 'attackUp' || attacker.action === 'attackDown') {
-    return attacker.chips[attacker.action]
+  if (attacker.action === 'attackUp' || attacker.action === 'attackDown' || attacker.action === 'crouchPunch' || attacker.action === 'crouchKick') {
+    return chipRatio(attacker.chips[attacker.action])
   }
   return BLOCK_CHIP
 }
@@ -321,6 +324,7 @@ function resetFighter(fighter: FighterState, x: number, facing: 1 | -1): Fighter
     invuln: 0,
     attackResolved: false,
     ko: false,
+    crouching: false,
     special: null,
   }
 }
@@ -461,7 +465,7 @@ function pushAttack(events: GameEvent[], before: FighterState, after: FighterSta
   if (isAttack(before.action) || !isAttack(after.action)) {
     return
   }
-  if (after.action === 'attackUp' || after.action === 'attackDown' || after.action === 'special') {
+  if (after.action === 'attackUp' || after.action === 'attackDown' || after.action === 'crouchPunch' || after.action === 'crouchKick' || after.action === 'special') {
     events.push({ type: 'attack', fighter: after.id, attack: after.action })
   }
 }
@@ -491,6 +495,7 @@ function shotFrom(before: FighterState, after: FighterState): ProjectileState | 
     w: special.hitW,
     h: special.hitH,
     chip: chipRatio(special.chip),
+    level: special.hitLevel ?? 'mid',
   }
 }
 
@@ -540,10 +545,12 @@ function previewHit(attacker: FighterState, defender: FighterState): HitPreview 
   if (!spec) {
     return null
   }
+  const level = hitLevelOf(attacker)
+  if (level === 'high' && defender.crouching) {
+    return null
+  }
   const rawDamage = Math.max(1, Math.round(spec.damage * attacker.damageScale))
-  const facesAttacker = (defender.facing === 1 && attacker.x >= defender.x)
-    || (defender.facing === -1 && attacker.x <= defender.x)
-  const blocked = defender.blocking && facesAttacker && defender.y < 0.35
+  const blocked = blocksStrike(defender, level, attacker.x)
   const damage = blocked ? chipDamage(rawDamage, strikeChip(attacker)) : rawDamage
   const dir = Math.sign(defender.x - attacker.x) || attacker.facing
 
@@ -579,6 +586,7 @@ function receiveHit(defender: FighterState, hit: HitPreview): FighterState {
       vx: hit.knockback,
       vy: 0,
       blocking: true,
+      crouching: defender.crouching,
     }
   }
   return {
@@ -593,14 +601,15 @@ function receiveHit(defender: FighterState, hit: HitPreview): FighterState {
     vx: hit.knockback,
     vy: Math.max(defender.vy, hit.hop),
     blocking: false,
+    crouching: false,
   }
 }
 
 function continueAttack(base: FighterState, fighter: FighterState, dt: number, arena: ArenaBounds): FighterState | null {
-  if (fighter.action !== 'attackUp' && fighter.action !== 'attackDown' && fighter.action !== 'special') {
+  if (fighter.action !== 'attackUp' && fighter.action !== 'attackDown' && fighter.action !== 'crouchPunch' && fighter.action !== 'crouchKick' && fighter.action !== 'special') {
     return null
   }
-  const spec = fighter.action === 'special' ? fighter.special : ATTACKS[fighter.action]
+  const spec = fighter.action === 'special' ? fighter.special : attackSpec(fighter)
   if (!spec) {
     return null
   }
@@ -656,6 +665,7 @@ function beginSpecial(
     vy,
     vx,
     blocking: false,
+    crouching: false,
   }
 }
 
@@ -685,9 +695,7 @@ function stepProjectiles(
     if (defender.ko || defender.invuln > 0 || !overlaps(box, hurtbox(defender))) {
       return [moved]
     }
-    const faces = (defender.facing === 1 && moved.x >= defender.x)
-      || (defender.facing === -1 && moved.x <= defender.x)
-    const blocked = defender.blocking && faces && defender.y < 0.35
+    const blocked = blocksStrike(defender, moved.level, moved.x)
     const damage = blocked ? chipDamage(moved.damage, moved.chip) : moved.damage
     const dir = Math.sign(defender.x - moved.x) || attacker.facing
     const hit: HitPreview = {
@@ -777,11 +785,14 @@ function stepFighter(
 
   const vertical = integrateVertical(fighter.y, fighter.vy, dt)
   const grounded = vertical.y <= 0
+  const wantsCrouch = Boolean(intent.crouch) && grounded
   let action: FighterState['action'] = grounded ? 'idle' : 'jump'
   let vx = 0
   const speed = fighter.speed
 
-  if (intent.block && grounded) {
+  if (wantsCrouch) {
+    action = 'crouch'
+  } else if (intent.block && grounded) {
     action = 'block'
     vx = intent.move * speed * 0.28
   } else if (!grounded) {
@@ -792,27 +803,23 @@ function stepFighter(
     vx = intent.move * speed
   }
 
-  if (combo && grounded) {
+  if (combo && grounded && !wantsCrouch) {
     return beginSpecial(base, fighter, combo, opponent, arena)
   }
 
-  if (grounded && (intent.attackUp || intent.attackDown)) {
-    const attack = intent.attackUp ? 'attackUp' : 'attackDown'
-    return {
-      ...base,
-      action: attack,
-      actionTime: 0,
-      attackResolved: false,
-      special: null,
-      x: clampX(fighter.x, arena),
-      y: 0,
-      vy: 0,
-      vx: 0,
-      blocking: false,
-    }
+  if (grounded && wantsCrouch && (intent.attackUp || intent.attackDown)) {
+    return beginStrike(base, fighter, intent.attackUp ? 'crouchPunch' : 'crouchKick', arena, true)
   }
 
-  if (intent.jump && grounded && !intent.block && !trapJump) {
+  if (grounded && !wantsCrouch && (intent.attackUp || intent.attackDown)) {
+    return beginStrike(base, fighter, intent.attackUp ? 'attackUp' : 'attackDown', arena, false)
+  }
+
+  if (!grounded && (intent.attackUp || intent.attackDown)) {
+    return beginStrike(base, fighter, intent.attackUp ? 'attackUp' : 'attackDown', arena, false, true)
+  }
+
+  if (intent.jump && grounded && !intent.block && !wantsCrouch && !trapJump) {
     return {
       ...base,
       action: 'jump',
@@ -822,10 +829,11 @@ function stepFighter(
       vy: JUMP_SPEED,
       vx,
       blocking: false,
+      crouching: false,
     }
   }
 
-  const sameLocomotion = action === fighter.action && (action === 'idle' || action === 'walk' || action === 'block' || action === 'jump')
+  const sameLocomotion = action === fighter.action && (action === 'idle' || action === 'walk' || action === 'block' || action === 'crouch' || action === 'jump')
   return {
     ...base,
     action,
@@ -834,8 +842,32 @@ function stepFighter(
     y: vertical.y,
     vy: vertical.vy,
     vx,
-    blocking: action === 'block',
+    blocking: action === 'block' || (action === 'crouch' && Boolean(intent.block)),
+    crouching: wantsCrouch,
     special: null,
+  }
+}
+
+function beginStrike(
+  base: FighterState,
+  fighter: FighterState,
+  attack: AttackName,
+  arena: ArenaBounds,
+  crouching: boolean,
+  airborne = false,
+): FighterState {
+  return {
+    ...base,
+    action: attack,
+    actionTime: 0,
+    attackResolved: false,
+    special: null,
+    x: clampX(fighter.x, arena),
+    y: airborne ? fighter.y : 0,
+    vy: airborne ? fighter.vy : 0,
+    vx: 0,
+    blocking: false,
+    crouching,
   }
 }
 

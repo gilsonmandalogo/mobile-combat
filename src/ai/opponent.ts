@@ -1,9 +1,9 @@
 import { profileFor } from '@src/ai/profiles'
 import { intentForToken, pickSpecial, specialScript } from '@src/ai/specials'
 import type { ScriptBeat } from '@src/ai/specials'
-import { attackPhase, isAttack } from '@src/sim/hitboxes'
+import { attackPhase, attackSpec, isAttack } from '@src/sim/hitboxes'
 import { EMPTY_INTENT } from '@src/sim/types'
-import type { Difficulty, FighterState, Intent } from '@src/sim/types'
+import type { Difficulty, FighterState, HitLevel, Intent } from '@src/sim/types'
 
 export type AiStateName = 'approach' | 'attack' | 'block' | 'evade' | 'retreat' | 'special'
 
@@ -105,12 +105,20 @@ export function stepAi(
   }
   if (state === 'block') {
     intent.block = true
+    const level = threatLevel(enemy)
+    if (level === 'low' && (profile.crouchBlock >= 1 || roll() < profile.crouchBlock)) {
+      intent.crouch = true
+    }
   }
   if (state === 'evade' && self.y <= 0 && memory.state !== 'evade') {
     intent.jump = true
   }
   if (state === 'attack') {
-    if (roll() < profile.heavy) {
+    const pick = roll()
+    if (pick < profile.lowAttack) {
+      intent.crouch = true
+      intent.attackDown = true
+    } else if (pick < profile.heavy) {
       intent.attackDown = true
     } else {
       intent.attackUp = true
@@ -149,6 +157,13 @@ export function stepAi(
       specialCd: profile.specialCd,
     }
   }
+}
+
+function threatLevel(enemy: FighterState): HitLevel {
+  if (enemy.y > 0.25) {
+    return 'overhead'
+  }
+  return attackSpec(enemy)?.hitLevel ?? 'mid'
 }
 
 function playScript(memory: AiMemory, facing: 1 | -1, dt: number): { memory: AiMemory; intent: Intent } {

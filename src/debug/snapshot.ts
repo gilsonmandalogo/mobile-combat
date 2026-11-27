@@ -13,6 +13,7 @@ export interface DebugFighter {
   facing: number
   device: string
   blocking: boolean
+  crouching: boolean
   ko: boolean
   characterId: string
 }
@@ -51,6 +52,7 @@ export function snapshotMatch(state: MatchState, ready: boolean, aiState: string
     facing: fighter.facing,
     device: fighter.device,
     blocking: fighter.blocking,
+    crouching: fighter.crouching,
     ko: fighter.ko,
     characterId: fighter.characterId,
   })) as [DebugFighter, DebugFighter]

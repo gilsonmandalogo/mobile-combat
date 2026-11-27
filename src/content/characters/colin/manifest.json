@@ -17,8 +17,10 @@
     "license": "Existing project model shipped with Mobile Combat."
   },
   "moves": [
-    { "name": "Jab", "input": "Punch up", "damage": 9, "chip": 0.1 },
-    { "name": "Sweep", "input": "Punch down", "damage": 14, "chip": 0.15 }
+    { "name": "Jab", "input": "Punch up", "damage": 9, "chip": 0.1, "slot": "attackUp", "hitLevel": "high", "height": "stand" },
+    { "name": "Sweep", "input": "Punch down", "damage": 14, "chip": 0.15, "slot": "attackDown", "hitLevel": "low", "height": "stand" },
+    { "name": "Crouch jab", "input": "Crouch + Punch", "damage": 7, "chip": 0.1, "slot": "crouchPunch", "hitLevel": "mid", "height": "crouch", "startup": 0.08, "active": 0.12, "recovery": 0.2, "reach": 0.86, "hitY": 0.55, "hitW": 0.7, "hitH": 0.4, "knockback": 3.4, "hop": 1.4 },
+    { "name": "Low sweep", "input": "Crouch + Kick", "damage": 12, "chip": 0.2, "slot": "crouchKick", "hitLevel": "low", "height": "crouch", "startup": 0.16, "active": 0.14, "recovery": 0.34, "reach": 1.08, "hitY": 0.28, "hitW": 1.05, "hitH": 0.32, "knockback": 5.6, "hop": 2.4 }
   ],
   "combos": [
     {

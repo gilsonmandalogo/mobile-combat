@@ -1,7 +1,8 @@
 import { CatalogError, arenaSchema, characterSchema, folderId, formatIssues } from '@src/content/schema'
 import type { ArenaDef, CharacterDef } from '@src/content/schema'
-import { BLOCK_CHIP } from '@src/sim/constants'
-import type { AttackChips } from '@src/sim/types'
+import { BLOCK_CHIP, defaultAttackBook } from '@src/sim/constants'
+import type { AttackSpec } from '@src/sim/constants'
+import type { AttackChips, AttackName } from '@src/sim/types'
 
 const characterModules = import.meta.glob('./characters/*/manifest.json', {
   eager: true,
@@ -51,16 +52,72 @@ export function defaultPicks(roster: Array<{ id: string }>): { player1: number; 
 export function moveList(def: CharacterDef): string[] {
   return [
     'Block — hold Block',
+    'Crouch — hold Down',
     ...def.moves.map((move) => `${move.name} — ${move.input}`),
     ...def.combos.map((combo) => `${combo.name} — ${combo.sequence.join(', ')}`),
   ]
 }
 
-export function attackChips(moves: Array<{ input: string; chip?: number }>): AttackChips {
-  const ratio = (move: { chip?: number } | undefined) => move?.chip === undefined ? BLOCK_CHIP : move.chip
-  const up = moves.find((move) => /up/i.test(move.input)) ?? moves[0]
-  const down = moves.find((move) => /down/i.test(move.input)) ?? moves[1] ?? moves[0]
-  return { attackUp: ratio(up), attackDown: ratio(down) }
+const TIMING_KEYS = ['startup', 'active', 'recovery', 'reach', 'hitY', 'hitW', 'hitH', 'knockback', 'hop'] as const
+
+export function moveSlot(move: { input: string; slot?: AttackName }): AttackName | null {
+  if (move.slot) {
+    return move.slot
+  }
+  const input = move.input.toLowerCase()
+  const crouch = input.includes('crouch')
+  if (crouch && (input.includes('kick') || input.includes('sweep'))) {
+    return 'crouchKick'
+  }
+  if (crouch) {
+    return 'crouchPunch'
+  }
+  if (input.includes('up')) {
+    return 'attackUp'
+  }
+  if (input.includes('down')) {
+    return 'attackDown'
+  }
+  return null
+}
+
+export function attackBook(moves: CharacterDef['moves']): Record<AttackName, AttackSpec> {
+  const book = defaultAttackBook()
+  for (const move of moves) {
+    const slot = moveSlot(move)
+    if (!slot) {
+      continue
+    }
+    const next: AttackSpec = { ...book[slot], hitLevel: move.hitLevel ?? book[slot].hitLevel }
+    if (slot === 'crouchPunch' || slot === 'crouchKick') {
+      next.damage = move.damage
+      for (const key of TIMING_KEYS) {
+        const value = move[key]
+        if (typeof value === 'number') {
+          next[key] = value
+        }
+      }
+    }
+    book[slot] = next
+  }
+  return book
+}
+
+export function attackChips(moves: Array<{ input: string; chip?: number; slot?: AttackName }>): AttackChips {
+  const chips: AttackChips = {
+    attackUp: BLOCK_CHIP,
+    attackDown: BLOCK_CHIP,
+    crouchPunch: BLOCK_CHIP,
+    crouchKick: BLOCK_CHIP,
+  }
+  for (const move of moves) {
+    const slot = moveSlot(move)
+    if (!slot || move.chip === undefined) {
+      continue
+    }
+    chips[slot] = move.chip
+  }
+  return chips
 }
 
 export function stepRoster(index: number, delta: number, count: number): number {

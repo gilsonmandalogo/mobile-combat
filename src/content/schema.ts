@@ -21,11 +21,29 @@ const primitiveModelSchema = z.object({
 
 const chipSchema = z.number().min(0).max(1)
 
+export const hitLevelSchema = z.enum(['high', 'mid', 'low', 'overhead'])
+
+const strikeTiming = {
+  startup: z.number().nonnegative().optional(),
+  active: z.number().positive().optional(),
+  recovery: z.number().nonnegative().optional(),
+  reach: z.number().positive().optional(),
+  hitY: z.number().nonnegative().optional(),
+  hitW: z.number().positive().optional(),
+  hitH: z.number().positive().optional(),
+  knockback: z.number().nonnegative().optional(),
+  hop: z.number().nonnegative().optional(),
+}
+
 export const moveSchema = z.object({
   name: z.string().min(1),
   input: z.string().min(1),
   damage: z.number().positive(),
   chip: chipSchema.optional(),
+  slot: z.enum(['attackUp', 'attackDown', 'crouchPunch', 'crouchKick']).optional(),
+  hitLevel: hitLevelSchema.optional(),
+  height: z.enum(['stand', 'crouch']).optional(),
+  ...strikeTiming,
 })
 
 export const tokenSchema = z.enum(['back', 'forward', 'up', 'punch', 'kick'])
@@ -47,6 +65,7 @@ export const comboSchema = z.object({
   knockback: z.number().nonnegative(),
   hop: z.number().nonnegative(),
   chip: chipSchema.optional(),
+  hitLevel: hitLevelSchema.optional(),
 })
 
 export const characterSchema = z.object({

@@ -1,14 +1,15 @@
-import type { ArenaBounds } from '@src/sim/constants'
+import type { ArenaBounds, AttackSpec } from '@src/sim/constants'
 
 export type FighterId = 'player1' | 'player2'
-export type Action = 'idle' | 'walk' | 'jump' | 'attackUp' | 'attackDown' | 'special' | 'block' | 'hitstun' | 'ko'
+export type Action = 'idle' | 'walk' | 'jump' | 'crouch' | 'attackUp' | 'attackDown' | 'crouchPunch' | 'crouchKick' | 'special' | 'block' | 'hitstun' | 'ko'
 export type InputToken = 'back' | 'forward' | 'up' | 'punch' | 'kick'
 export type SpecialEffect = 'projectile' | 'dash' | 'uppercut' | 'teleport'
 export type DeviceKind = 'keyboard' | 'gamepad' | 'ai'
 export type MatchStatus = 'menu' | 'running' | 'paused' | 'roundEnd' | 'matchEnd'
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'nightmare'
 export type MatchMode = 'local' | 'ai'
-export type AttackName = 'attackUp' | 'attackDown'
+export type AttackName = 'attackUp' | 'attackDown' | 'crouchPunch' | 'crouchKick'
+export type HitLevel = 'high' | 'mid' | 'low' | 'overhead'
 
 export interface Intent {
   move: -1 | 0 | 1
@@ -16,6 +17,7 @@ export interface Intent {
   attackUp: boolean
   attackDown: boolean
   block: boolean
+  crouch: boolean
 }
 
 export const EMPTY_INTENT: Intent = {
@@ -24,6 +26,7 @@ export const EMPTY_INTENT: Intent = {
   attackUp: false,
   attackDown: false,
   block: false,
+  crouch: false,
 }
 
 export interface FighterState {
@@ -40,6 +43,7 @@ export interface FighterState {
   action: Action
   actionTime: number
   blocking: boolean
+  crouching: boolean
   blockstun: number
   hitstun: number
   invuln: number
@@ -51,6 +55,7 @@ export interface FighterState {
   damageScale: number
   chips: AttackChips
   combos: ComboSpec[]
+  attacks: Record<AttackName, AttackSpec>
   special: ActiveSpecial | null
 }
 
@@ -114,11 +119,14 @@ export interface FighterProfile {
   damageScale?: number
   chips?: AttackChips
   combos?: ComboSpec[]
+  attacks?: Record<AttackName, AttackSpec>
 }
 
 export interface AttackChips {
   attackUp: number
   attackDown: number
+  crouchPunch?: number
+  crouchKick?: number
 }
 
 export interface ComboSpec {
@@ -139,6 +147,7 @@ export interface ComboSpec {
   hop: number
   /** Fraction of damage that lands while blocking. Omitted means the default chip. */
   chip?: number
+  hitLevel?: HitLevel
 }
 
 export interface ActiveSpecial extends ComboSpec {
@@ -172,4 +181,5 @@ export interface ProjectileState {
   w: number
   h: number
   chip: number
+  level: HitLevel
 }

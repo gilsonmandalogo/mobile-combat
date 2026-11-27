@@ -9,6 +9,7 @@ const bindings = {
   attackUp: 'KeyG',
   attackDown: 'KeyV',
   block: 'KeyY',
+  crouch: 'KeyS',
 }
 
 class FakeKeys implements KeyTarget {
@@ -37,6 +38,7 @@ describe('keyboard intents', () => {
       attackUp: true,
       attackDown: false,
       block: true,
+      crouch: false,
     })
   })
 

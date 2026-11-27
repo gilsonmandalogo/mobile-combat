@@ -31,7 +31,7 @@ test('a front block chips damage, plays the cue, and shows on the HUD and move l
     api.setIntent('player1', { ...idle, move: 1 })
     api.setIntent('player2', { ...idle, move: -1, block: true })
     api.stepFor(2.2)
-    api.setIntent('player1', { ...idle, attackDown: true })
+    api.setIntent('player1', { ...idle, attackUp: true })
     api.setIntent('player2', { ...idle, block: true })
     api.stepFor(0.45)
     return { state: api.getState(), cue: api.getAudio().lastCue }

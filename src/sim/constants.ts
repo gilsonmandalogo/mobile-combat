@@ -1,4 +1,4 @@
-import type { AttackName } from '@src/sim/types'
+import type { AttackName, HitLevel } from '@src/sim/types'
 
 export const MAX_LIFE = 100
 export const ROUNDS_TO_WIN = 2
@@ -18,6 +18,7 @@ export const BLOCK_STUN_SCALE = 0.6
 export const BLOCK_STUN_MIN = 0.16
 export const HURT_HALF_W = 0.36
 export const HURT_HEIGHT = 1.72
+export const CROUCH_HURT_HEIGHT = 0.98
 export const SPAWN_X = 3.6
 
 export interface ArenaBounds {
@@ -45,9 +46,10 @@ export interface AttackSpec {
   hitW: number
   hitH: number
   hop: number
+  hitLevel?: HitLevel
 }
 
-export const ATTACKS: Record<AttackName, AttackSpec> = {
+export const ATTACKS: Record<'attackUp' | 'attackDown', AttackSpec> = {
   attackUp: {
     damage: 9,
     knockback: 4.2,
@@ -60,6 +62,7 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
     hitW: 0.78,
     hitH: 0.52,
     hop: 3.2,
+    hitLevel: 'high',
   },
   attackDown: {
     damage: 14,
@@ -73,7 +76,48 @@ export const ATTACKS: Record<AttackName, AttackSpec> = {
     hitW: 0.86,
     hitH: 0.5,
     hop: 4.4,
+    hitLevel: 'mid',
   },
+}
+
+export const CROUCH_ATTACKS: Record<'crouchPunch' | 'crouchKick', AttackSpec> = {
+  crouchPunch: {
+    damage: 7,
+    knockback: 3.4,
+    hitstun: 0.28,
+    startup: 0.08,
+    active: 0.12,
+    recovery: 0.2,
+    reach: 0.86,
+    hitY: 0.55,
+    hitW: 0.7,
+    hitH: 0.4,
+    hop: 1.4,
+    hitLevel: 'mid',
+  },
+  crouchKick: {
+    damage: 12,
+    knockback: 5.6,
+    hitstun: 0.42,
+    startup: 0.16,
+    active: 0.14,
+    recovery: 0.34,
+    reach: 1.08,
+    hitY: 0.28,
+    hitW: 1.05,
+    hitH: 0.32,
+    hop: 2.4,
+    hitLevel: 'low',
+  },
+}
+
+export function defaultAttackBook(): Record<AttackName, AttackSpec> {
+  return {
+    attackUp: { ...ATTACKS.attackUp },
+    attackDown: { ...ATTACKS.attackDown },
+    crouchPunch: { ...CROUCH_ATTACKS.crouchPunch },
+    crouchKick: { ...CROUCH_ATTACKS.crouchKick },
+  }
 }
 
 export function attackDuration(spec: AttackSpec): number {

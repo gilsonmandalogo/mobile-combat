@@ -56,8 +56,20 @@ describe('character catalog', () => {
     expect(moveList(characterById('colin'))).toContain('Block — hold Block')
     expect(moveList(characterById('colin'))).toContain('Ember — back, forward, punch')
     expect(moveList(characterById('brute'))).toContain('Riser — forward, up, punch')
-    expect(attackChips(characterById('colin').moves)).toEqual({ attackUp: 0.1, attackDown: 0.15 })
-    expect(attackChips([{ input: 'Punch up' }])).toEqual({ attackUp: 0.2, attackDown: 0.2 })
+    expect(attackChips(characterById('colin').moves)).toEqual({
+      attackUp: 0.1,
+      attackDown: 0.15,
+      crouchPunch: 0.1,
+      crouchKick: 0.2,
+    })
+    expect(attackChips([{ input: 'Punch up' }])).toEqual({
+      attackUp: 0.2,
+      attackDown: 0.2,
+      crouchPunch: 0.2,
+      crouchKick: 0.2,
+    })
+    expect(moveList(characterById('colin'))).toContain('Crouch — hold Down')
+    expect(moveList(characterById('colin'))).toContain('Low sweep — Crouch + Kick')
     expect(characterById('colin').combos[0].chip).toBe(0.4)
   })
 })

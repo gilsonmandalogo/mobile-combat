@@ -18,9 +18,10 @@ const ACTION_LABELS: Record<ActionName, string> = {
   attackUp: 'Punch up',
   attackDown: 'Punch down',
   block: 'Block',
+  crouch: 'Crouch',
 }
 
-const PAD_ACTIONS: Array<keyof PadBindings> = ['jump', 'attackUp', 'attackDown', 'block']
+const PAD_ACTIONS: Array<keyof PadBindings> = ['jump', 'attackUp', 'attackDown', 'block', 'crouch']
 
 interface Listening {
   kind: 'key' | 'pad'

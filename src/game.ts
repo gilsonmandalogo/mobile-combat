@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import Player from '@src/player'
 import Animations from '@src/animations'
-import { arenaById, attackChips, characterById } from '@src/content/catalog'
+import { arenaById, attackBook, attackChips, characterById } from '@src/content/catalog'
 import type { CharacterDef } from '@src/content/schema'
 import { updateDebug } from '@src/debug'
 import { settingsStore } from '@stores/settings'
@@ -427,6 +427,7 @@ function profileFrom(def: CharacterDef): FighterProfile {
     damageScale: def.stats.damage,
     chips: attackChips(def.moves),
     combos: def.combos,
+    attacks: attackBook(def.moves),
   }
 }
 
